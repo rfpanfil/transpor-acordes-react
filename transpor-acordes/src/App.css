@@ -1,0 +1,275 @@
+/* src/App.css */
+body {
+  background-color: #282c34;
+  color: white;
+  font-family: sans-serif;
+  padding: 20px;
+}
+
+.App {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #61dafb;
+}
+
+h2 {
+  border-bottom: 1px solid #4a505c;
+  padding-bottom: 10px;
+  margin-top: 0;
+}
+
+.controls, .input-area, .result-area {
+  background-color: #3c414d;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.controls-grid {
+  display: flex; /* Muda de 'grid' para 'flex' */
+  justify-content: space-between; /* Empurra os filhos para os cantos opostos */
+  align-items: end; /* Alinha a parte de baixo dos dois blocos */
+  gap: 20px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+textarea, input[type="number"] {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #282c34;
+  color: white;
+  border: 1px solid #61dafb;
+  border-radius: 4px;
+  padding: 10px;
+  font-family: monospace;
+}
+
+textarea {
+  height: 250px;
+  resize: vertical;
+}
+
+.main-button {
+  width: 100%;
+  padding: 15px;
+  font-size: 1.2em;
+  font-weight: bold;
+  background-color: #61dafb;
+  color: #282c34;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.main-button:hover {
+  background-color: #4fa8c8;
+}
+
+.main-button:disabled {
+  background-color: #4a505c;
+  cursor: not-allowed;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: #282c34;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.file-input-wrapper {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.file-input-wrapper input[type="file"] {
+  display: none;
+}
+
+.file-input-label {
+  background-color: #4a505c;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-block;
+  transition: background-color 0.2s;
+}
+
+.file-input-label:hover {
+  background-color: #5a606c;
+}
+
+.result-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.result-actions button {
+  background-color: #4a505c;
+  color: white;
+  font-size: 0.9em;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  flex-grow: 1;
+  transition: background-color 0.2s;
+}
+
+.result-actions button:hover {
+  background-color: #5a606c;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #4a505c;
+  margin-bottom: 20px;
+}
+
+.tab-button {
+  padding: 10px 20px;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  color: #ccc;
+  font-size: 1.1em;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px; /* Alinha com a borda principal */
+}
+
+.tab-button.active {
+  color: #61dafb;
+  border-bottom: 2px solid #61dafb;
+}
+
+.sequence-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 15px;
+}
+
+.chord-card {
+  background-color: #282c34;
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.chord-card .original {
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+.chord-card .transposed {
+  font-size: 1.5em;
+  color: #FF4B4B; /* Cor de destaque do Streamlit */
+  font-weight: bold;
+}
+
+.copy-block {
+  background-color: #282c34;
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 20px;
+  white-space: pre-wrap;
+  font-family: monospace;
+}
+
+.custom-number-input {
+  display: inline-flex; /* Faz o container ter o tamanho do conteúdo */
+  align-items: center; /* Alinha verticalmente os botões e o número no meio */
+  background-color: #282c34; /* Fundo escuro para o formato de "pílula" */
+  border: 1px solid #4a505c; /* Borda sutil */
+  border-radius: 50px; /* Borda bem arredondada */
+  padding: 6px;
+}
+
+.custom-number-input button {
+  /* Tamanho e forma */
+  width: 38px;
+  height: 38px;
+  border-radius: 50%; /* Garante o formato de círculo */
+  padding: 0; /* Remove qualquer padding que possa esticar o botão */
+  
+  /* Centralização do conteúdo (+/-) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Estilo e Interação */
+  background-color: #4a505c;
+  color: white;
+  border: none;
+  font-size: 1.6em; /* Aumenta um pouco o tamanho do sinal */
+  font-weight: normal;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  
+  /* Propriedades para garantir consistência */
+  flex-shrink: 0;
+  box-sizing: border-box; 
+  line-height: 1;
+}
+
+.sequence-input {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #282c34;
+  color: white;
+  border: 1px solid #61dafb;
+  border-radius: 4px;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 1.2em; /* Fonte Aumentada */
+}
+
+.cifra-textarea {
+  width: 100%;
+  height: 250px;
+  box-sizing: border-box;
+  background-color: #282c34;
+  color: white;
+  border: 1px solid #61dafb;
+  border-radius: 4px;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 1.2em; /* Fonte Aumentada */
+  resize: vertical;
+}
+
+.custom-number-input button:hover {
+  background-color: #5a606c;
+}
+
+.custom-number-input span {
+  font-size: 1.4em;
+  font-weight: bold;
+  font-family: monospace;
+  padding: 0 20px;       /* Aumenta o espaçamento entre os botões e o número */
+  min-width: 40px;       /* Largura mínima para o número não "pular" */
+  text-align: center;
+}
+
+.action-control,
+.interval-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}

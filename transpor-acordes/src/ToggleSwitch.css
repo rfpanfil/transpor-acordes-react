@@ -1,0 +1,61 @@
+.toggle-container {
+  display: flex;
+  position: relative;
+  background-color: #282c34;
+  border-radius: 50px;
+  border: 1px solid #4a505c;
+  padding: 4px; /* Adiciona um padding interno */
+}
+
+.toggle-option {
+  flex: 1;
+  padding: 8px 15px;
+  background-color: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  position: relative; /* Cada opção é um container relativo */
+  z-index: 2;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.toggle-option.active .toggle-label {
+  color: #282c34; /* Texto escuro quando ativo */
+}
+
+/* O texto fica em um span para garantir que esteja sempre acima do glider */
+.toggle-label {
+  position: relative;
+  z-index: 2;
+  transition: color 0.3s ease;
+}
+
+.toggle-glider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #61dafb;
+  border-radius: 50px;
+  z-index: 1;
+}
+
+/* Remove o anel de foco padrão e o substitui por uma sombra sutil */
+.toggle-option:focus {
+  outline: none; /* Remove o outline para clicks */
+}
+
+.toggle-option:focus-visible {
+  outline: none; /* Remove o outline para navegação com teclado */
+  box-shadow: 0 0 0 2px #282c34, 0 0 0 4px rgba(97, 218, 251, 0.7); /* Borda azul suave */
+}
+
+/* Opcional: Se quiser um efeito de borda similar no container do NumberInput ao focar: */
+.custom-number-input:focus-within {
+  box-shadow: 0 0 0 2px #282c34, 0 0 0 4px rgba(97, 218, 251, 0.7);
+  border-color: transparent; /* Remove a borda existente para não ficar duplicado */
+}
