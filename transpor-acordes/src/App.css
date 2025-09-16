@@ -185,11 +185,13 @@ pre {
 
 .copy-block {
   background-color: #282c34;
-  padding: 15px;
+  padding: 20px;
   border-radius: 4px;
   margin-top: 20px;
   white-space: pre-wrap;
   font-family: monospace;
+  font-size: 1.4em; /* Aumenta a fonte consideravelmente */
+  line-height: 1.7; /* Aumenta o espaço entre as linhas */
 }
 
 .custom-number-input {
@@ -272,4 +274,10 @@ pre {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.tab-description {
+  font-size: 1.1em; /* Aumenta o texto em 10% */
+  opacity: 0.9;
+  margin-bottom: 20px; /* Garante um bom espaçamento */
 }

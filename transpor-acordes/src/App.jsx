@@ -152,7 +152,7 @@ function App() {
       {activeTab === 'sequence' && (
         <div className="input-area">
           <h2>2. Insira a Sequência de Acordes</h2>
-          <p>Use esta aba para transpor uma lista simples de acordes separados por espaço.</p>
+          <p className="tab-description">Use esta aba para transpor uma lista simples de acordes separados por espaço.</p>
           <input
             type="text"
             className="sequence-input"
@@ -195,7 +195,7 @@ function App() {
         <>
           <div className="input-area">
             <h2>2. Insira a Cifra</h2>
-            <p>Cole o texto abaixo OU envie um arquivo.</p>
+            <p className="tab-description">Cole o texto abaixo OU envie um arquivo.</p>
             <textarea
               className="cifra-textarea"
               placeholder="Ex:&#10;D G A&#10;Minha canção..."
