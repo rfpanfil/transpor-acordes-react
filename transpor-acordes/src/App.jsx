@@ -1,5 +1,4 @@
-// src/App.jsx
-
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 import React, { useState } from 'react';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
@@ -78,7 +77,7 @@ function App() {
       setIsLoading(false);
     }
   };
-  
+
   const handleCopy = () => {
     navigator.clipboard.writeText(transposedCifra);
     setIsCopied(true);
@@ -96,14 +95,14 @@ function App() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
+
   const handleClearCifra = () => {
     setCifraText('');
     setSelectedFile(null);
     setTransposedCifra('');
     setError('');
     if (document.getElementById('file-upload')) {
-        document.getElementById('file-upload').value = null;
+      document.getElementById('file-upload').value = null;
     }
   };
 
@@ -115,14 +114,14 @@ function App() {
   return (
     <div className="App">
       <h1>🎵 Transpositor Universal de Acordes</h1>
-      
+
       <div className="controls">
         <h2>1. Escolha a Transposição</h2>
         <div className="controls-grid">
           {/* DIV COM A CLASSE CORRIGIDA */}
           <div className="action-control">
             <label>Ação</label>
-            <ToggleSwitch 
+            <ToggleSwitch
               options={actionOptions}
               selectedValue={action}
               onChange={setAction}
@@ -130,7 +129,7 @@ function App() {
           </div>
           <div className="interval-control">
             <label>Intervalo (em tons)</label>
-            <NumberInput 
+            <NumberInput
               value={interval}
               onChange={setInterval}
               step={0.5}
@@ -160,32 +159,32 @@ function App() {
             value={sequenceText}
             onChange={(e) => setSequenceText(e.target.value)}
           />
-          <button className="main-button" style={{marginTop: '15px'}} onClick={handleSequenceTranspose} disabled={isLoading}>
+          <button className="main-button" style={{ marginTop: '15px' }} onClick={handleSequenceTranspose} disabled={isLoading}>
             {isLoading ? 'Transpondo...' : 'Transpor Sequência!'}
           </button>
-          
+
           {sequenceResult && (
             <div className="result-area">
-                <h2>🎸 Resultado da Sequência</h2>
-                <div className="sequence-results-grid">
-                    {sequenceResult.original_chords.map((original, index) => (
-                        <div key={index} className="chord-card">
-                            <div className="original">{original}</div>
-                            <div className="transposed">{sequenceResult.transposed_chords[index]}</div>
-                        </div>
-                    ))}
+              <h2>🎸 Resultado da Sequência</h2>
+              <div className="sequence-results-grid">
+                {sequenceResult.original_chords.map((original, index) => (
+                  <div key={index} className="chord-card">
+                    <div className="original">{original}</div>
+                    <div className="transposed">{sequenceResult.transposed_chords[index]}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="copy-block">
+                Originais:   {sequenceResult.original_chords.join(' ')}
+                <br />
+                Transpostos: {sequenceResult.transposed_chords.join(' ')}
+              </div>
+              {sequenceResult.explanations.length > 0 && (
+                <div style={{ marginTop: '15px' }}>
+                  <h4>ℹ️ Informações Adicionais</h4>
+                  {sequenceResult.explanations.map((exp, i) => <p key={i} className="explanation-text">{exp}</p>)}
                 </div>
-                <div className="copy-block">
-                    Originais:   {sequenceResult.original_chords.join(' ')}
-                    <br />
-                    Transpostos: {sequenceResult.transposed_chords.join(' ')}
-                </div>
-                {sequenceResult.explanations.length > 0 && (
-                    <div style={{marginTop: '15px'}}>
-                        <h4>ℹ️ Informações Adicionais</h4>
-                        {sequenceResult.explanations.map((exp, i) => <p key={i} className="explanation-text">{exp}</p>)}
-                    </div>
-                )}
+              )}
             </div>
           )}
         </div>
@@ -215,11 +214,11 @@ function App() {
                 Selecionar Arquivo (.txt, .docx)
               </label>
               <input id="file-upload" type="file" onChange={(e) => {
-                  const file = e.target.files[0];
-                  if(file) {
-                      setSelectedFile(file);
-                      setCifraText('');
-                  }
+                const file = e.target.files[0];
+                if (file) {
+                  setSelectedFile(file);
+                  setCifraText('');
+                }
               }} accept=".txt,.docx" />
               {selectedFile && <p>Arquivo selecionado: {selectedFile.name}</p>}
             </div>
@@ -228,7 +227,7 @@ function App() {
           <button className="main-button" onClick={handleCifraTranspose} disabled={isLoading || (!cifraText && !selectedFile)}>
             {isLoading ? 'Transpondo...' : 'Transpor Cifra!'}
           </button>
-          
+
           {transposedCifra && (
             <div className="result-area">
               <h2>🎸 Cifra Transposta</h2>
@@ -243,7 +242,7 @@ function App() {
         </>
       )}
 
-       {error && <p style={{color: '#ff4b4b', textAlign: 'center', marginTop: '15px'}}>{error}</p>}
+      {error && <p style={{ color: '#ff4b4b', textAlign: 'center', marginTop: '15px' }}>{error}</p>}
     </div>
   );
 }
