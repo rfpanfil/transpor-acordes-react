@@ -9,48 +9,38 @@ import './App.css';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 function App() {
-  // --- ESTADOS GERAIS ---
   const [activeTab, setActiveTab] = useState('sequence');
   const [interval, setInterval] = useState(1.0);
   const [action, setAction] = useState('Aumentar');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // --- ESTADOS DA ABA "TRANSPOR SEQUÊNCIA" ---
   const [sequenceText, setSequenceText] = useState('');
   const [sequenceResult, setSequenceResult] = useState(null);
-
-  // --- ESTADOS DA ABA "TRANSPOR CIFRA COMPLETA" ---
   const [cifraText, setCifraText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [transposedCifra, setTransposedCifra] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // --- REFS ---
   const dragCounter = useRef(0);
   const fileStatusRef = useRef(null);
 
-  // --- EFEITO PARA ROLAGEM ---
   useEffect(() => {
     if (selectedFile && fileStatusRef.current) {
       fileStatusRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [selectedFile]);
 
-  // --- FUNÇÕES DE TRANSPOSIÇÃO ---
   const handleSequenceTranspose = async () => {
     setIsLoading(true);
     setError('');
     setSequenceResult(null);
-
     const chords = sequenceText.trim().split(/\s+/).filter(c => c);
     if (chords.length === 0) {
       setError('Por favor, insira uma sequência de acordes.');
       setIsLoading(false);
       return;
     }
-
     try {
       const response = await fetch(`${API_BASE_URL}/transpose-sequence`, {
         method: 'POST',
@@ -99,7 +89,6 @@ function App() {
     }
   };
 
-  // --- FUNÇÕES AUXILIARES ---
   const handleCopy = () => {
     navigator.clipboard.writeText(transposedCifra);
     setIsCopied(true);
@@ -128,7 +117,6 @@ function App() {
     }
   };
 
-  // --- FUNÇÕES PARA O DRAG AND DROP ---
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -261,7 +249,7 @@ function App() {
         <>
           <div className="input-area">
             <h2>2. Insira a Cifra</h2>
-            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo aqui!</p>
+            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo em qualquer lugar da tela.</p>
             <textarea
               className="cifra-textarea"
               placeholder="Ex:&#10;D G A&#10;Minha canção..."
@@ -314,6 +302,15 @@ function App() {
       )}
 
       {error && <p style={{ color: '#ff4b4b', textAlign: 'center', marginTop: '15px' }}>{error}</p>}
+
+      <footer className="app-footer">
+        <p>
+          Desenvolvido para a Glória de Deus.
+          <br />
+          Copyright &copy; Rafael Panfil
+        </p>
+      </footer>
+
     </div>
   );
 }

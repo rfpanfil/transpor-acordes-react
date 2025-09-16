@@ -297,3 +297,17 @@ pre {
   animation: fadeIn 0.5s;
   font-weight: bold; /* Reutiliza a animação de fade-in */
 }
+
+.app-footer {
+  margin-top: 50px; /* Espaço acima do rodapé */
+  padding-top: 25px; /* Espaço interno acima do texto */
+  border-top: 1px solid #4a505c; /* Linha sutil de separação */
+  text-align: center; /* Centraliza o texto */
+  font-size: 0.9em; /* Fonte um pouco menor */
+  color: #9ab; /* Cor sutil para o texto */
+}
+
+.app-footer p {
+    line-height: 1.6; /* Melhora o espaçamento entre as linhas */
+    margin: 0;
+}
