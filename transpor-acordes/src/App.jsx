@@ -261,7 +261,7 @@ function App() {
         <>
           <div className="input-area">
             <h2>2. Insira a Cifra</h2>
-            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo em qualquer lugar da tela.</p>
+            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo aqui!</p>
             <textarea
               className="cifra-textarea"
               placeholder="Ex:&#10;D G A&#10;Minha canção..."
