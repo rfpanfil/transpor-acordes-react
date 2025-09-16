@@ -286,3 +286,13 @@ pre {
   transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
   border: 2px dashed transparent; /* Borda inicial invisível */
 }
+
+.file-selected-feedback {
+  background-color: #3a6b7e; /* Um tom de azul para destaque */
+  color: #eafcff;
+  padding: 10px 15px;
+  border-radius: 5px;
+  margin-top: 15px;
+  border: 1px solid #61dafb;
+  animation: fadeIn 0.5s; /* Reutiliza a animação de fade-in */
+}

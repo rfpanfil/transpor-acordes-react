@@ -1,6 +1,6 @@
 // src/App.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
 import DragDropOverlay from './DragDropOverlay';
@@ -26,6 +26,17 @@ function App() {
   const [transposedCifra, setTransposedCifra] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // --- REFS ---
+  const dragCounter = useRef(0);
+  const fileStatusRef = useRef(null);
+
+  // --- EFEITO PARA ROLAGEM ---
+  useEffect(() => {
+    if (selectedFile && fileStatusRef.current) {
+      fileStatusRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedFile]);
 
   // --- FUNÇÕES DE TRANSPOSIÇÃO ---
   const handleSequenceTranspose = async () => {
@@ -121,6 +132,7 @@ function App() {
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounter.current++;
     if (activeTab === 'cifra') {
       setIsDragging(true);
     }
@@ -129,7 +141,10 @@ function App() {
   const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
   };
 
   const handleDragOver = (e) => {
@@ -141,6 +156,7 @@ function App() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    dragCounter.current = 0;
     if (activeTab === 'cifra') {
       const file = e.dataTransfer.files[0];
       if (file && (file.name.endsWith('.txt') || file.name.endsWith('.docx'))) {
@@ -271,7 +287,11 @@ function App() {
                   setCifraText('');
                 }
               }} accept=".txt,.docx" />
-              {selectedFile && <p>Arquivo selecionado: {selectedFile.name}</p>}
+              {selectedFile &&
+                <p ref={fileStatusRef} className="file-selected-feedback">
+                  Arquivo selecionado: {selectedFile.name}
+                </p>
+              }
             </div>
           </div>
 
