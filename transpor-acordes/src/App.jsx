@@ -1,8 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 import React, { useState } from 'react';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
 import './App.css';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 function App() {
   const [activeTab, setActiveTab] = useState('sequence');
@@ -30,7 +31,7 @@ function App() {
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/transpose-sequence', {
+      const response = await fetch(`${API_BASE_URL}/transpose-sequence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chords, action, interval }),
@@ -57,12 +58,12 @@ function App() {
         formData.append('file', selectedFile);
         formData.append('action', action);
         formData.append('interval', interval);
-        response = await fetch('http://127.0.0.1:8000/transpose-file', {
+        response = await fetch(`${API_BASE_URL}/transpose-file`, {
           method: 'POST',
           body: formData,
         });
       } else {
-        response = await fetch('http://127.0.0.1:8000/transpose-text', {
+        response = await fetch(`${API_BASE_URL}/transpose-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cifra_text: cifraText, action, interval }),
