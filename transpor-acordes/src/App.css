@@ -294,5 +294,6 @@ pre {
   border-radius: 5px;
   margin-top: 15px;
   border: 1px solid #61dafb;
-  animation: fadeIn 0.5s; /* Reutiliza a animação de fade-in */
+  animation: fadeIn 0.5s;
+  font-weight: bold; /* Reutiliza a animação de fade-in */
 }
