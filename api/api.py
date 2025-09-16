@@ -33,7 +33,11 @@ class TransposeSequenceResponse(BaseModel):
 app = FastAPI()
 
 # --- Configuração do CORS ---
-origins = ["http://localhost:3000", "http://localhost:5173"]
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://transpositor-react.vercel.app"  # <-- SUBSTITUA PELA SUA URL DO VERCEL
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
