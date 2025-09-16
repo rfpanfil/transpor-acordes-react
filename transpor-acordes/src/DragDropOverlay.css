@@ -1,0 +1,36 @@
+/* src/DragDropOverlay.css */
+
+.drag-drop-overlay {
+  position: fixed;
+  /* Cobre a tela inteira */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(18, 21, 28, 0.9); /* Fundo escuro semi-transparente */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* Garante que fique na frente de tudo */
+  pointer-events: none; /* Permite que eventos do mouse "passem" por ele */
+  opacity: 0;
+  animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.overlay-content {
+  border: 4px dashed #61dafb;
+  padding: 40px 80px;
+  border-radius: 20px;
+  text-align: center;
+  color: #61dafb;
+}
+
+.overlay-content h1 {
+  font-size: 3em;
+  margin: 0;
+}

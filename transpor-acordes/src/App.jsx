@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
+import DragDropOverlay from './DragDropOverlay';
 import './App.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
@@ -24,7 +25,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [transposedCifra, setTransposedCifra] = useState('');
   const [isCopied, setIsCopied] = useState(false);
-  const [isDragging, setIsDragging] = useState(false); // Para o Drag and Drop
+  const [isDragging, setIsDragging] = useState(false);
 
   // --- FUNÇÕES DE TRANSPOSIÇÃO ---
   const handleSequenceTranspose = async () => {
@@ -59,7 +60,6 @@ function App() {
     setIsLoading(true);
     setError('');
     setTransposedCifra('');
-
     try {
       let response;
       if (selectedFile) {
@@ -88,7 +88,7 @@ function App() {
     }
   };
 
-  // --- FUNÇÕES AUXILIARES (COPIAR, BAIXAR, LIMPAR) ---
+  // --- FUNÇÕES AUXILIARES ---
   const handleCopy = () => {
     navigator.clipboard.writeText(transposedCifra);
     setIsCopied(true);
@@ -121,7 +121,9 @@ function App() {
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
+    if (activeTab === 'cifra') {
+      setIsDragging(true);
+    }
   };
 
   const handleDragLeave = (e) => {
@@ -139,11 +141,12 @@ function App() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file && (file.name.endsWith('.txt') || file.name.endsWith('.docx'))) {
-      setSelectedFile(file);
-      setCifraText('');
+    if (activeTab === 'cifra') {
+      const file = e.dataTransfer.files[0];
+      if (file && (file.name.endsWith('.txt') || file.name.endsWith('.docx'))) {
+        setSelectedFile(file);
+        setCifraText('');
+      }
     }
   };
 
@@ -153,7 +156,15 @@ function App() {
   ];
 
   return (
-    <div className="App">
+    <div
+      className="App"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {isDragging && <DragDropOverlay />}
+
       <h1>🎵 Transpositor Universal de Acordes</h1>
 
       <div className="controls">
@@ -232,15 +243,9 @@ function App() {
 
       {activeTab === 'cifra' && (
         <>
-          <div
-            className={`input-area ${isDragging ? 'drag-over' : ''}`}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
+          <div className="input-area">
             <h2>2. Insira a Cifra</h2>
-            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo aqui.</p>
+            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo em qualquer lugar da tela.</p>
             <textarea
               className="cifra-textarea"
               placeholder="Ex:&#10;D G A&#10;Minha canção..."
