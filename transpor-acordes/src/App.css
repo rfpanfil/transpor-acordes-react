@@ -281,3 +281,14 @@ pre {
   opacity: 0.9;
   margin-bottom: 20px; /* Garante um bom espaçamento */
 }
+
+.input-area {
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  border: 2px dashed transparent; /* Borda inicial invisível */
+}
+
+/* Estilo que será aplicado quando um arquivo estiver sendo arrastado por cima */
+.input-area.drag-over {
+  background-color: #4a505c;
+  border-color: #61dafb; /* Borda azul pontilhada para feedback */
+}

@@ -1,3 +1,5 @@
+// src/App.jsx
+
 import React, { useState } from 'react';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
@@ -6,18 +8,25 @@ import './App.css';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 function App() {
+  // --- ESTADOS GERAIS ---
   const [activeTab, setActiveTab] = useState('sequence');
   const [interval, setInterval] = useState(1.0);
   const [action, setAction] = useState('Aumentar');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // --- ESTADOS DA ABA "TRANSPOR SEQUÊNCIA" ---
   const [sequenceText, setSequenceText] = useState('');
   const [sequenceResult, setSequenceResult] = useState(null);
+
+  // --- ESTADOS DA ABA "TRANSPOR CIFRA COMPLETA" ---
   const [cifraText, setCifraText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [transposedCifra, setTransposedCifra] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isDragging, setIsDragging] = useState(false); // Para o Drag and Drop
 
+  // --- FUNÇÕES DE TRANSPOSIÇÃO ---
   const handleSequenceTranspose = async () => {
     setIsLoading(true);
     setError('');
@@ -79,6 +88,7 @@ function App() {
     }
   };
 
+  // --- FUNÇÕES AUXILIARES (COPIAR, BAIXAR, LIMPAR) ---
   const handleCopy = () => {
     navigator.clipboard.writeText(transposedCifra);
     setIsCopied(true);
@@ -107,6 +117,36 @@ function App() {
     }
   };
 
+  // --- FUNÇÕES PARA O DRAG AND DROP ---
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.txt') || file.name.endsWith('.docx'))) {
+      setSelectedFile(file);
+      setCifraText('');
+    }
+  };
+
   const actionOptions = [
     { label: 'Aumentar', value: 'Aumentar' },
     { label: 'Diminuir', value: 'Diminuir' }
@@ -119,7 +159,6 @@ function App() {
       <div className="controls">
         <h2>1. Escolha a Transposição</h2>
         <div className="controls-grid">
-          {/* DIV COM A CLASSE CORRIGIDA */}
           <div className="action-control">
             <label>Ação</label>
             <ToggleSwitch
@@ -193,9 +232,15 @@ function App() {
 
       {activeTab === 'cifra' && (
         <>
-          <div className="input-area">
+          <div
+            className={`input-area ${isDragging ? 'drag-over' : ''}`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
             <h2>2. Insira a Cifra</h2>
-            <p className="tab-description">Cole o texto abaixo OU envie um arquivo.</p>
+            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo aqui.</p>
             <textarea
               className="cifra-textarea"
               placeholder="Ex:&#10;D G A&#10;Minha canção..."
@@ -212,7 +257,7 @@ function App() {
             />
             <div className="file-input-wrapper">
               <label htmlFor="file-upload" className="file-input-label">
-                Selecionar Arquivo (.txt, .docx)
+                Ou Selecione um Arquivo (.txt, .docx)
               </label>
               <input id="file-upload" type="file" onChange={(e) => {
                 const file = e.target.files[0];
