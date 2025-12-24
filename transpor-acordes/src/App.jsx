@@ -249,7 +249,7 @@ function App() {
     <div className="App" onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
       {isDragging && <DragDropOverlay />}
 
-      <h1>🎵 Transpositor Universal de Acordes!</h1>
+      <h1>🎵 Transpositor Universal de Acordes</h1>
 
       <div className="controls">
         <h2>1. Escolha a Transposição</h2>
