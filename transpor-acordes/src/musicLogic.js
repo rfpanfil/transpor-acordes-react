@@ -1,4 +1,4 @@
-// /src/musicLogic.js
+// src/musicLogic.js
 
 const MAPA_NOTAS = {
   "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
@@ -68,6 +68,7 @@ export const calcularSequenciaLocal = (acordes, action, interval) => {
 
   acordes.forEach(acordeOriginal => {
     // Regex: Nota (Grupo 1) + Resto (Grupo 2)
+    // Aqui mantemos simples pois a entrada já é isolada
     const match = acordeOriginal.match(/^([A-G](?:##|bb|#|b)?)(.*)$/i);
 
     if (!match) {
@@ -121,7 +122,7 @@ const isChordLine = (line) => {
   const trimmed = line.trim();
   if (!trimmed) return false;
   
-  // *** CORREÇÃO CRÍTICA AQUI: Adicionamos (?:##|bb|#|b)? ***
+  // Regex para identificar a linha (essa pode continuar ancorada no início/fim)
   const chordPattern = /^[A-G](?:##|bb|#|b)?(m|M|dim|aug|sus|add|maj|º|°|\/|[-+])?(\d+)?(\(?[^)\s]*\)?)?(\/[A-G](?:##|bb|#|b)?)?$/;
   
   const words = trimmed.replace(/\/|\|/g, ' ').trim().split(/\s+/);
@@ -139,12 +140,15 @@ export const processarCifraCompleta = (texto, action, interval) => {
   const semitons = (interval * 2) * (action === 'Aumentar' ? 1 : -1);
   const linhas = texto.split('\n');
   
-  // Regex global para encontrar acordes no meio do texto
-  const regexAcorde = /\b([A-G](?:##|bb|#|b)?)([^A-G\s,.\n\/]*)?(\/[A-G](?:##|bb|#|b)?)?\b/g;
+  // *** NOVA REGEX ***
+  // Captura: (Prefixo não-nota)(Nota)(Qualidade)(Baixo)
+  // Removemos o \b traidor e usamos grupos manuais
+  const regexAcorde = /(^|[^A-Ga-g#b])([A-G](?:##|bb|#|b)?)([^A-G\s,.\n\/]*)?(\/[A-G](?:##|bb|#|b)?)?/g;
 
   const linhasProcessadas = linhas.map(linha => {
     if (isChordLine(linha)) {
-      return linha.replace(regexAcorde, (match, nota, qualidade, baixo) => {
+      // Note que agora temos o argumento 'prefix'
+      return linha.replace(regexAcorde, (match, prefix, nota, qualidade, baixo) => {
         // Normaliza nota
         const notaNorm = normalizarNota(nota);
         const novaNota = transporNotaIndividual(notaNorm, semitons);
@@ -158,7 +162,8 @@ export const processarCifraCompleta = (texto, action, interval) => {
           novoBaixoStr = "/" + transporNotaIndividual(notaBaixoNorm, semitons);
         }
         
-        return `${novaNota}${qual}${novoBaixoStr}`;
+        // Reconstrói mantendo o prefixo original (ex: parênteses, tablatura, etc)
+        return `${prefix}${novaNota}${qual}${novoBaixoStr}`;
       });
     }
     return linha;
