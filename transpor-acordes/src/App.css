@@ -311,3 +311,38 @@ pre {
     line-height: 1.6; /* Melhora o espaçamento entre as linhas */
     margin: 0;
 }
+
+/* --- Media Query para Telas Pequenas (Responsividade) --- */
+@media (max-width: 600px) {
+
+  /* Ajusta o padding geral da aplicação para telas menores */
+  .App {
+    padding: 15px;
+    margin-top: 20px;
+  }
+
+  /* Diminui o título principal no celular */
+  h1 {
+    font-size: 2em;
+  }
+
+  /* A MÁGICA ACONTECE AQUI */
+  /* Muda o layout do grid de controles para uma coluna vertical */
+  .controls-grid {
+    flex-direction: column; /* Empilha os itens verticalmente */
+    align-items: stretch;   /* Faz os itens ocuparem a largura total */
+    gap: 30px;              /* Aumenta o espaço vertical entre eles */
+  }
+
+  /* Garante que os controles internos mantenham o alinhamento centralizado */
+  .action-control,
+  .interval-control {
+    align-items: center; 
+  }
+
+  /* Ajusta o tamanho da fonte do resultado para caber melhor */
+  .copy-block {
+    font-size: 1.1em;
+    line-height: 1.6;
+  }
+}
