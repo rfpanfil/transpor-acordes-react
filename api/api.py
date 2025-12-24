@@ -1,5 +1,5 @@
 # api.py
-# VERSÃO CORRIGIDA (Regex de detecção de linha atualizada)
+# VERSÃO FINAL (Regex Corrigida para C## e bb na API)
 
 from fastapi import FastAPI, File, UploadFile, Form
 from pydantic import BaseModel
@@ -62,6 +62,7 @@ EXPLICACAO_TEORICA = {
 def transpor_nota_individual(nota_str, semitons):
     nota_key = next((key for key in MAPA_NOTAS if key.lower() == nota_str.lower()), None)
     if not nota_key: return nota_str
+    
     valor_original = MAPA_NOTAS[nota_key]
     novo_valor = (valor_original + semitons + 12) % 12
     return MAPA_VALORES_NOTAS[novo_valor]
@@ -77,6 +78,7 @@ def normalizar_nota(nota_str, explicacoes_set=None):
             if explicacoes_set is not None:
                 explicacoes_set.add(f"A nota {nota_str} é enarmônica de {nova_nota} (Duplo Sustenido).")
             return nova_nota
+
     if nota_str.endswith("bb"):
         base = nota_str.replace("bb", "")
         base_key = next((k for k in MAPA_NOTAS if k.lower() == base.lower()), None)
@@ -87,6 +89,7 @@ def normalizar_nota(nota_str, explicacoes_set=None):
             if explicacoes_set is not None:
                 explicacoes_set.add(f"A nota {nota_str} é enarmônica de {nova_nota} (Duplo Bemol).")
             return nova_nota
+            
     return nota_str
 
 def transpor_acordes_sequencia(acordes_originais, acao, intervalo):
@@ -94,18 +97,25 @@ def transpor_acordes_sequencia(acordes_originais, acao, intervalo):
     semitons_ajuste = intervalo_semitons if acao == 'Aumentar' else -intervalo_semitons
     acordes_transpostos = []
     explicacoes_entrada = set()
+    
     for acorde_original in acordes_originais:
         match = re.match(r"^([A-G](?:##|bb|#|b)?)(.*)", acorde_original, re.IGNORECASE)
+        
         if not match:
             acordes_transpostos.append(f"{acorde_original}?")
             continue
+        
         nota_bruta, resto = match.groups()
+        
         nota_fundamental = normalizar_nota(nota_bruta, explicacoes_entrada)
+        
         if nota_fundamental == nota_bruta:
             nota_key = next((k for k in EXPLICACAO_TEORICA if k.lower() == nota_fundamental.lower()), None)
             if nota_key:
                 explicacoes_entrada.add(EXPLICACAO_TEORICA[nota_key])
+
         nova_fundamental = transpor_nota_individual(nota_fundamental, semitons_ajuste)
+        
         if '/' in resto:
             partes = resto.split('/')
             qualidade = partes[0]
@@ -115,13 +125,15 @@ def transpor_acordes_sequencia(acordes_originais, acao, intervalo):
             acorde_final = f"{nova_fundamental}{qualidade}/{novo_baixo}"
         else:
             acorde_final = f"{nova_fundamental}{resto}"
+            
         acordes_transpostos.append(acorde_final)
+
     return acordes_transpostos, list(explicacoes_entrada)
 
 def is_chord_line(line):
     line = line.strip()
     if not line: return False
-    # REGEX CORRIGIDA AQUI: Adicionado (?:##|bb|#|b)?
+    # Regex atualizada para identificar linhas de acordes com ## ou bb
     chord_pattern = re.compile(r'^[A-G](?:##|bb|#|b)?(m|M|dim|aug|sus|add|maj|º|°|/|[-+])?(\d+)?(\(?[^)\s]*\)?)?(/[A-G](?:##|bb|#|b)?)?$')
     words = line.replace('/:', '').replace('|', '').strip().split()
     if not words: return False
@@ -130,25 +142,44 @@ def is_chord_line(line):
 
 def processar_cifra(texto_cifra, acao, intervalo):
     semitons = int(intervalo * 2) * (1 if acao == 'Aumentar' else -1)
-    padrao_acorde = r'\b([A-G](?:##|bb|#|b)?)([^A-G\s,.\n]*)?(/[A-G](?:##|bb|#|b)?)?\b'
+    
+    # NOVA REGEX PODEROSA:
+    # Captura: (Prefixo não-nota)(Nota)(Qualidade)(Baixo)
+    # Isso impede que o regex corte "C##" em "C" + "##"
+    padrao_acorde = r'(^|[^A-Ga-g#b])([A-G](?:##|bb|#|b)?)([^A-G\s,.\n\/]*)?(\/[A-G](?:##|bb|#|b)?)?'
+    
     def replacer(match):
-        nota, qualidade, baixo = match.groups()
+        prefixo, nota, qualidade, baixo = match.groups()
+        
+        # Garante que não seja None (caso o grupo não capture nada)
+        prefixo = prefixo or ""
         qualidade = qualidade or ""
         novo_baixo = ""
+        
+        # 1. Normaliza
         nota_norm = normalizar_nota(nota)
+        
+        # 2. Transpõe
         nova_nota = transpor_nota_individual(nota_norm, semitons)
+
         if baixo:
+            # Remove a barra, normaliza e transpõe o baixo
             nota_baixo = baixo.replace('/', '')
             nota_baixo_norm = normalizar_nota(nota_baixo)
             novo_baixo = "/" + transpor_nota_individual(nota_baixo_norm, semitons)
-        return f"{nova_nota}{qualidade}{novo_baixo}"
+        
+        # 3. Reconstrói mantendo o prefixo original (ex: parênteses, espaço)
+        return f"{prefixo}{nova_nota}{qualidade}{novo_baixo}"
+
     linhas = texto_cifra.split('\n')
     linhas_finais = []
+    
     for linha in linhas:
         if is_chord_line(linha):
             linhas_finais.append(re.sub(padrao_acorde, replacer, linha))
         else:
             linhas_finais.append(linha)
+            
     return "\n".join(linhas_finais)
 
 async def ler_conteudo_arquivo(file: UploadFile) -> str:
@@ -161,10 +192,16 @@ async def ler_conteudo_arquivo(file: UploadFile) -> str:
             return f"Erro ao ler arquivo .docx: {str(e)}"
     return content.decode("utf-8")
 
+# --- ENDPOINTS (AGORA ASYNC) ---
+
 @app.post("/transpose-sequence", response_model=TransposeSequenceResponse)
 async def transpose_sequence_endpoint(request: TransposeSequenceRequest):
     transposed, expl = transpor_acordes_sequencia(request.chords, request.action, request.interval)
-    return { "original_chords": request.chords, "transposed_chords": transposed, "explanations": expl }
+    return {
+        "original_chords": request.chords,
+        "transposed_chords": transposed,
+        "explanations": expl
+    }
 
 @app.post("/transpose-text", response_model=TransposeCifraResponse)
 async def transpose_text_endpoint(request: TransposeCifraRequest):
