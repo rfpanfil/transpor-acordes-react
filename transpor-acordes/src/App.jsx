@@ -8,7 +8,7 @@ import { calcularSequenciaLocal } from './musicLogic'; // Importa a lógica offl
 import './App.css';
 
 // URL da API (Render)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://transpor-acordes-react-api.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://1transpor-acordes-react-api.onrender.com';
 
 function App() {
   const [activeTab, setActiveTab] = useState('sequence');
