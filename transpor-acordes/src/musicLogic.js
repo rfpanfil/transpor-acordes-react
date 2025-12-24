@@ -10,10 +10,10 @@ const MAPA_NOTAS = {
 const MAPA_VALORES_NOTAS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 const EXPLICACAO_NOTAS_TEORICAS = {
-  "E#": "Mi sustenido (E#) soa igual a Fá (F).",
-  "B#": "Si sustenido (B#) soa igual a Dó (C).",
-  "Fb": "Fá bemol (Fb) soa igual a Mi (E).",
-  "Cb": "Dó bemol (Cb) soa igual a Si (B)."
+  "E#": "Mi sustenido (E#) é enarmônico de Fá (F).",
+  "B#": "Si sustenido (B#) é enarmônico de Dó (C).",
+  "Fb": "Fá bemol (Fb) é enarmônico de Mi (E).",
+  "Cb": "Dó bemol (Cb) é enarmônico de Si (B)."
 };
 
 // --- FUNÇÕES AUXILIARES ---
@@ -28,7 +28,7 @@ export const normalizarNota = (notaStr, explicacoesSet = null) => {
       const valorBase = MAPA_NOTAS[baseKey];
       const novoValor = (valorBase + 2) % 12;
       const novaNota = MAPA_VALORES_NOTAS[novoValor];
-      if (explicacoesSet) explicacoesSet.add(`A nota ${notaStr} é teoricamente um ${novaNota} (Duplo Sustenido).`);
+      if (explicacoesSet) explicacoesSet.add(`A nota ${notaStr} é enarmônica de ${novaNota} (Duplo Sustenido).`);
       return novaNota;
     }
   }
@@ -42,7 +42,7 @@ export const normalizarNota = (notaStr, explicacoesSet = null) => {
       const valorBase = MAPA_NOTAS[baseKey];
       const novoValor = (valorBase - 2 + 12) % 12; // +12 para evitar negativo
       const novaNota = MAPA_VALORES_NOTAS[novoValor];
-      if (explicacoesSet) explicacoesSet.add(`A nota ${notaStr} é teoricamente um ${novaNota} (Duplo Bemol).`);
+      if (explicacoesSet) explicacoesSet.add(`A nota ${notaStr} é enarmônica de ${novaNota} (Duplo Bemol).`);
       return novaNota;
     }
   }
