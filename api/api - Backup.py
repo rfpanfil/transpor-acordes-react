@@ -1,5 +1,5 @@
 # api.py
-# VERSÃO FINAL (CORS Liberado para Android + Regex C## Corrigida)
+# VERSÃO FINAL (Regex Corrigida para C## e bb na API)
 
 from fastapi import FastAPI, File, UploadFile, Form
 from pydantic import BaseModel
@@ -30,11 +30,16 @@ class TransposeSequenceResponse(BaseModel):
 
 app = FastAPI()
 
-# --- Configuração CORS (LIBERADO PARA ANDROID) ---
-# O asterisco ["*"] permite que o App (Capacitor) conecte sem ser bloqueado
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://transpor-acordes-react.vercel.app", 
+    "https://transpositor-react.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -128,6 +133,7 @@ def transpor_acordes_sequencia(acordes_originais, acao, intervalo):
 def is_chord_line(line):
     line = line.strip()
     if not line: return False
+    # Regex atualizada para identificar linhas de acordes com ## ou bb
     chord_pattern = re.compile(r'^[A-G](?:##|bb|#|b)?(m|M|dim|aug|sus|add|maj|º|°|/|[-+])?(\d+)?(\(?[^)\s]*\)?)?(/[A-G](?:##|bb|#|b)?)?$')
     words = line.replace('/:', '').replace('|', '').strip().split()
     if not words: return False
@@ -137,23 +143,32 @@ def is_chord_line(line):
 def processar_cifra(texto_cifra, acao, intervalo):
     semitons = int(intervalo * 2) * (1 if acao == 'Aumentar' else -1)
     
-    # REGEX PODEROSA (Impede corte de C## e Dbb)
+    # NOVA REGEX PODEROSA:
+    # Captura: (Prefixo não-nota)(Nota)(Qualidade)(Baixo)
+    # Isso impede que o regex corte "C##" em "C" + "##"
     padrao_acorde = r'(^|[^A-Ga-g#b])([A-G](?:##|bb|#|b)?)([^A-G\s,.\n\/]*)?(\/[A-G](?:##|bb|#|b)?)?'
     
     def replacer(match):
         prefixo, nota, qualidade, baixo = match.groups()
+        
+        # Garante que não seja None (caso o grupo não capture nada)
         prefixo = prefixo or ""
         qualidade = qualidade or ""
+        novo_baixo = ""
         
+        # 1. Normaliza
         nota_norm = normalizar_nota(nota)
+        
+        # 2. Transpõe
         nova_nota = transpor_nota_individual(nota_norm, semitons)
 
-        novo_baixo = ""
         if baixo:
+            # Remove a barra, normaliza e transpõe o baixo
             nota_baixo = baixo.replace('/', '')
             nota_baixo_norm = normalizar_nota(nota_baixo)
             novo_baixo = "/" + transpor_nota_individual(nota_baixo_norm, semitons)
         
+        # 3. Reconstrói mantendo o prefixo original (ex: parênteses, espaço)
         return f"{prefixo}{nova_nota}{qualidade}{novo_baixo}"
 
     linhas = texto_cifra.split('\n')
@@ -176,6 +191,8 @@ async def ler_conteudo_arquivo(file: UploadFile) -> str:
         except Exception as e:
             return f"Erro ao ler arquivo .docx: {str(e)}"
     return content.decode("utf-8")
+
+# --- ENDPOINTS (AGORA ASYNC) ---
 
 @app.post("/transpose-sequence", response_model=TransposeSequenceResponse)
 async def transpose_sequence_endpoint(request: TransposeSequenceRequest):
