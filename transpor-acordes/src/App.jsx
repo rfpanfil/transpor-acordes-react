@@ -1,13 +1,15 @@
 // src/App.jsx
 
 import React, { useState, useRef, useEffect } from 'react';
+import mammoth from 'mammoth';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
 import DragDropOverlay from './DragDropOverlay';
-import { calcularSequenciaLocal } from './musicLogic'; // Importa a lógica offline
+// Importamos a lógica local para usar APENAS se a API falhar
+import { calcularSequenciaLocal, processarCifraCompleta } from './musicLogic';
 import './App.css';
 
-// URL da API (Render)
+// URL da sua API no Render
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://1transpor-acordes-react-api.onrender.com';
 
 function App() {
@@ -20,7 +22,6 @@ function App() {
   // Estados da Sequência
   const [sequenceText, setSequenceText] = useState('');
   const [sequenceResult, setSequenceResult] = useState(null);
-  const [usingOfflineMode, setUsingOfflineMode] = useState(false); // Indicador visual
 
   // Estados da Cifra
   const [cifraText, setCifraText] = useState('');
@@ -28,6 +29,9 @@ function App() {
   const [transposedCifra, setTransposedCifra] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Indicador visual se estamos usando o modo offline (backup)
+  const [usingOfflineMode, setUsingOfflineMode] = useState(false);
 
   const dragCounter = useRef(0);
   const fileStatusRef = useRef(null);
@@ -38,12 +42,38 @@ function App() {
     }
   }, [selectedFile]);
 
-  // --- FUNÇÃO HÍBRIDA: SEQUÊNCIA ---
+  // Função auxiliar para ler arquivos localmente (usada no Fallback)
+  const lerArquivoLocal = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          if (file.name.endsWith('.docx')) {
+            const arrayBuffer = e.target.result;
+            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            resolve(result.value);
+          } else {
+            resolve(e.target.result);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      if (file.name.endsWith('.docx')) {
+        reader.readAsArrayBuffer(file);
+      } else {
+        reader.readAsText(file);
+      }
+    });
+  };
+
+  // --- 1. SEQUÊNCIA (HÍBRIDO) ---
   const handleSequenceTranspose = async () => {
     setIsLoading(true);
     setError('');
     setSequenceResult(null);
-    setUsingOfflineMode(false);
+    setUsingOfflineMode(false); // Reseta o aviso
 
     const chords = sequenceText.trim().split(/\s+/).filter(c => c);
     if (chords.length === 0) {
@@ -53,9 +83,9 @@ function App() {
     }
 
     try {
-      // Tenta a API primeiro com timeout curto (5s)
+      // TENTA A API (PLAN A)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos max
 
       const response = await fetch(`${API_BASE_URL}/transpose-sequence`, {
         method: 'POST',
@@ -72,11 +102,10 @@ function App() {
       setSequenceResult(data);
 
     } catch (err) {
-      // SE A API FALHAR, USA O MODO LOCAL (OFFLINE)
-      console.log("API indisponível ou lenta. Ativando modo offline.", err);
+      // SE FALHAR, USA LOCAL (PLAN B)
+      console.log("API indisponível ou lenta. Usando modo offline.", err);
       setUsingOfflineMode(true);
 
-      // Usa a função do arquivo musicLogic.js
       const data = calcularSequenciaLocal(chords, action, interval);
       setSequenceResult(data);
     } finally {
@@ -84,13 +113,25 @@ function App() {
     }
   };
 
-  // --- FUNÇÃO DA CIFRA (Mantida via API por enquanto para suportar arquivos .docx) ---
+  // --- 2. CIFRA COMPLETA E ARQUIVOS (HÍBRIDO) ---
   const handleCifraTranspose = async () => {
     setIsLoading(true);
     setError('');
     setTransposedCifra('');
+    setUsingOfflineMode(false);
+
+    // Validação básica
+    if (!cifraText && !selectedFile) {
+      setError('O texto ou arquivo está vazio.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
+      // TENTA A API (PLAN A)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s para arquivos (pode demorar mais)
+
       let response;
       if (selectedFile) {
         const formData = new FormData();
@@ -101,22 +142,47 @@ function App() {
         response = await fetch(`${API_BASE_URL}/transpose-file`, {
           method: 'POST',
           body: formData,
+          signal: controller.signal
         });
       } else {
         response = await fetch(`${API_BASE_URL}/transpose-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cifra_text: cifraText, action, interval }),
+          signal: controller.signal
         });
       }
 
-      if (!response.ok) throw new Error('A resposta da API não foi bem-sucedida.');
+      clearTimeout(timeoutId);
+
+      if (!response.ok) throw new Error('Falha na API');
       const data = await response.json();
       setTransposedCifra(data.transposed_cifra);
 
     } catch (err) {
-      // Aqui poderíamos implementar uma versão offline para texto puro no futuro
-      setError('O servidor Render está "dormindo" ou indisponível. Para Cifras Completas e Arquivos, precisamos do servidor online. Tente novamente em 1 minuto ou use a aba "Sequência" (que funciona offline).');
+      // SE FALHAR, USA LOCAL (PLAN B)
+      console.log("API falhou. Ativando processamento local de arquivo/texto.", err);
+      setUsingOfflineMode(true);
+
+      try {
+        let textToProcess = cifraText;
+
+        // Se for arquivo, precisamos ler ele localmente agora
+        if (selectedFile) {
+          textToProcess = await lerArquivoLocal(selectedFile);
+        }
+
+        if (!textToProcess || !textToProcess.trim()) {
+          throw new Error("Conteúdo vazio para processamento offline.");
+        }
+
+        const resultado = processarCifraCompleta(textToProcess, action, interval);
+        setTransposedCifra(resultado);
+
+      } catch (localErr) {
+        console.error(localErr);
+        setError("Erro fatal: API indisponível e falha ao processar localmente.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -145,45 +211,31 @@ function App() {
     setSelectedFile(null);
     setTransposedCifra('');
     setError('');
+    setUsingOfflineMode(false);
     if (document.getElementById('file-upload')) {
       document.getElementById('file-upload').value = null;
     }
   };
 
-  // Drag and Drop Handlers
+  // Drag and Drop Logic
   const handleDragEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounter.current++;
-    if (activeTab === 'cifra') {
-      setIsDragging(true);
-    }
+    e.preventDefault(); e.stopPropagation(); dragCounter.current++;
+    if (activeTab === 'cifra') setIsDragging(true);
   };
-
   const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounter.current--;
-    if (dragCounter.current === 0) {
-      setIsDragging(false);
-    }
+    e.preventDefault(); e.stopPropagation(); dragCounter.current--;
+    if (dragCounter.current === 0) setIsDragging(false);
   };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
+  const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
   const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    dragCounter.current = 0;
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false); dragCounter.current = 0;
     if (activeTab === 'cifra') {
       const file = e.dataTransfer.files[0];
       if (file && (file.name.endsWith('.txt') || file.name.endsWith('.docx'))) {
         setSelectedFile(file);
         setCifraText('');
+      } else {
+        setError('Por favor, solte apenas arquivos .txt ou .docx');
       }
     }
   };
@@ -194,13 +246,7 @@ function App() {
   ];
 
   return (
-    <div
-      className="App"
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
+    <div className="App" onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
       {isDragging && <DragDropOverlay />}
 
       <h1>🎵 Transpositor Universal de Acordes</h1>
@@ -210,20 +256,11 @@ function App() {
         <div className="controls-grid">
           <div className="action-control">
             <label>Ação</label>
-            <ToggleSwitch
-              options={actionOptions}
-              selectedValue={action}
-              onChange={setAction}
-            />
+            <ToggleSwitch options={actionOptions} selectedValue={action} onChange={setAction} />
           </div>
           <div className="interval-control">
             <label>Intervalo (em tons)</label>
-            <NumberInput
-              value={interval}
-              onChange={setInterval}
-              step={0.5}
-              min={0.5}
-            />
+            <NumberInput value={interval} onChange={setInterval} step={0.5} min={0.5} />
           </div>
         </div>
       </div>
@@ -249,13 +286,13 @@ function App() {
             onChange={(e) => setSequenceText(e.target.value)}
           />
           <button className="main-button" style={{ marginTop: '15px' }} onClick={handleSequenceTranspose} disabled={isLoading}>
-            {isLoading ? 'Transpondo...' : 'Transpor Sequência!'}
+            {isLoading ? 'Processando...' : 'Transpor Sequência!'}
           </button>
 
-          {/* Feedback Visual do Modo Offline */}
+          {/* AVISO DE MODO OFFLINE */}
           {usingOfflineMode && sequenceResult && (
             <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
-              ⚠️ Servidor indisponível. Usando cálculo local (Offline).
+              ⚠️ API Render indisponível. Cálculo realizado offline.
             </p>
           )}
 
@@ -271,8 +308,7 @@ function App() {
                 ))}
               </div>
               <div className="copy-block">
-                Originais:   {sequenceResult.original_chords.join(' ')}
-                <br />
+                Originais:   {sequenceResult.original_chords.join(' ')}<br />
                 Transpostos: {sequenceResult.transposed_chords.join(' ')}
               </div>
               {sequenceResult.explanations.length > 0 && (
@@ -299,9 +335,7 @@ function App() {
                 setCifraText(e.target.value);
                 if (selectedFile) {
                   setSelectedFile(null);
-                  if (document.getElementById('file-upload')) {
-                    document.getElementById('file-upload').value = null;
-                  }
+                  if (document.getElementById('file-upload')) document.getElementById('file-upload').value = null;
                 }
               }}
             />
@@ -312,8 +346,13 @@ function App() {
               <input id="file-upload" type="file" onChange={(e) => {
                 const file = e.target.files[0];
                 if (file) {
-                  setSelectedFile(file);
-                  setCifraText('');
+                  if (file.name.endsWith('.txt') || file.name.endsWith('.docx')) {
+                    setSelectedFile(file);
+                    setCifraText('');
+                    setError('');
+                  } else {
+                    setError('Formato inválido. Use .txt ou .docx');
+                  }
                 }
               }} accept=".txt,.docx" />
               {selectedFile &&
@@ -325,8 +364,15 @@ function App() {
           </div>
 
           <button className="main-button" onClick={handleCifraTranspose} disabled={isLoading || (!cifraText && !selectedFile)}>
-            {isLoading ? 'Transpondo...' : 'Transpor Cifra!'}
+            {isLoading ? 'Processando...' : 'Transpor Cifra!'}
           </button>
+
+          {/* AVISO DE MODO OFFLINE NA CIFRA */}
+          {usingOfflineMode && transposedCifra && (
+            <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
+              ⚠️ API Render indisponível. Arquivo processado localmente.
+            </p>
+          )}
 
           {transposedCifra && (
             <div className="result-area">
@@ -345,13 +391,8 @@ function App() {
       {error && <p style={{ color: '#ff4b4b', textAlign: 'center', marginTop: '15px' }}>{error}</p>}
 
       <footer className="app-footer">
-        <p>
-          Desenvolvido para a Glória de Deus.
-          <br />
-          Copyright &copy; Rafael Panfil
-        </p>
+        <p>Desenvolvido para a Glória de Deus.<br />Copyright &copy; Rafael Panfil</p>
       </footer>
-
     </div>
   );
 }
