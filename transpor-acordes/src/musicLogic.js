@@ -120,8 +120,9 @@ export const calcularSequenciaLocal = (acordes, action, interval) => {
 const isChordLine = (line) => {
   const trimmed = line.trim();
   if (!trimmed) return false;
-  // Regex para identificar acordes soltos
-  const chordPattern = /^[A-G][b#]?(m|M|dim|aug|sus|add|maj|º|°|\/|[-+])?(\d+)?(\(?[^)\s]*\)?)?(\/[A-G][b#]?)?$/;
+  
+  // *** CORREÇÃO AQUI: Adicionado (?:##|bb|#|b)? para aceitar C## como acorde válido ***
+  const chordPattern = /^[A-G](?:##|bb|#|b)?(m|M|dim|aug|sus|add|maj|º|°|\/|[-+])?(\d+)?(\(?[^)\s]*\)?)?(\/[A-G](?:##|bb|#|b)?)?$/;
   
   const words = trimmed.replace(/\/|\|/g, ' ').trim().split(/\s+/);
   if (words.length === 0) return false;
@@ -131,7 +132,6 @@ const isChordLine = (line) => {
     if (chordPattern.test(w)) chordCount++;
   });
 
-  // Se mais de 50% das palavras forem acordes, consideramos uma linha de acordes
   return (chordCount / words.length) >= 0.5;
 };
 
@@ -140,7 +140,6 @@ export const processarCifraCompleta = (texto, action, interval) => {
   const linhas = texto.split('\n');
   
   // Regex global para encontrar acordes no meio do texto
-  // Captura: (Nota)(Qualidade)(/Baixo opcional)
   const regexAcorde = /\b([A-G](?:##|bb|#|b)?)([^A-G\s,.\n\/]*)?(\/[A-G](?:##|bb|#|b)?)?\b/g;
 
   const linhasProcessadas = linhas.map(linha => {
