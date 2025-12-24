@@ -121,7 +121,7 @@ const isChordLine = (line) => {
   const trimmed = line.trim();
   if (!trimmed) return false;
   
-  // *** CORREÇÃO AQUI: Adicionado (?:##|bb|#|b)? para aceitar C## como acorde válido ***
+  // *** CORREÇÃO CRÍTICA AQUI: Adicionamos (?:##|bb|#|b)? ***
   const chordPattern = /^[A-G](?:##|bb|#|b)?(m|M|dim|aug|sus|add|maj|º|°|\/|[-+])?(\d+)?(\(?[^)\s]*\)?)?(\/[A-G](?:##|bb|#|b)?)?$/;
   
   const words = trimmed.replace(/\/|\|/g, ' ').trim().split(/\s+/);
