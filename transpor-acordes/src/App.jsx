@@ -10,7 +10,7 @@ import { calcularSequenciaLocal, processarCifraCompleta } from './musicLogic';
 import './App.css';
 
 // URL da sua API no Render
-const API_BASE_URL = import.meta.env.V3ITE_API_URL || 'https://1111transpor-acordes-react-api.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://1111transpor-acordes-react-api.onrender.com';
 
 function App() {
   const [activeTab, setActiveTab] = useState('sequence');
