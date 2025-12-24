@@ -169,7 +169,7 @@ function App() {
     >
       {isDragging && <DragDropOverlay />}
 
-      <h1>🎵 Transpositor Universal de Acordes</h1>
+      <h1>🎵 Transpositor Universal de Acordes!</h1>
 
       <div className="controls">
         <h2>1. Escolha a Transposição</h2>
