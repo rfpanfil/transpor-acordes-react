@@ -4,9 +4,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
 import DragDropOverlay from './DragDropOverlay';
+import { calcularSequenciaLocal } from './musicLogic'; // Importa a lógica offline
 import './App.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+// URL da API (Render)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://transpor-acordes-react-api.onrender.com';
 
 function App() {
   const [activeTab, setActiveTab] = useState('sequence');
@@ -14,8 +16,13 @@ function App() {
   const [action, setAction] = useState('Aumentar');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Estados da Sequência
   const [sequenceText, setSequenceText] = useState('');
   const [sequenceResult, setSequenceResult] = useState(null);
+  const [usingOfflineMode, setUsingOfflineMode] = useState(false); // Indicador visual
+
+  // Estados da Cifra
   const [cifraText, setCifraText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [transposedCifra, setTransposedCifra] = useState('');
@@ -31,36 +38,58 @@ function App() {
     }
   }, [selectedFile]);
 
+  // --- FUNÇÃO HÍBRIDA: SEQUÊNCIA ---
   const handleSequenceTranspose = async () => {
     setIsLoading(true);
     setError('');
     setSequenceResult(null);
+    setUsingOfflineMode(false);
+
     const chords = sequenceText.trim().split(/\s+/).filter(c => c);
     if (chords.length === 0) {
       setError('Por favor, insira uma sequência de acordes.');
       setIsLoading(false);
       return;
     }
+
     try {
+      // Tenta a API primeiro com timeout curto (5s)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const response = await fetch(`${API_BASE_URL}/transpose-sequence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chords, action, interval }),
+        signal: controller.signal
       });
-      if (!response.ok) throw new Error('Falha na API de sequência');
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) throw new Error('Falha na API');
+
       const data = await response.json();
       setSequenceResult(data);
+
     } catch (err) {
-      setError('Falha ao se comunicar com a API. Verifique se o back-end Python está rodando.');
+      // SE A API FALHAR, USA O MODO LOCAL (OFFLINE)
+      console.log("API indisponível ou lenta. Ativando modo offline.", err);
+      setUsingOfflineMode(true);
+
+      // Usa a função do arquivo musicLogic.js
+      const data = calcularSequenciaLocal(chords, action, interval);
+      setSequenceResult(data);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // --- FUNÇÃO DA CIFRA (Mantida via API por enquanto para suportar arquivos .docx) ---
   const handleCifraTranspose = async () => {
     setIsLoading(true);
     setError('');
     setTransposedCifra('');
+
     try {
       let response;
       if (selectedFile) {
@@ -68,6 +97,7 @@ function App() {
         formData.append('file', selectedFile);
         formData.append('action', action);
         formData.append('interval', interval);
+
         response = await fetch(`${API_BASE_URL}/transpose-file`, {
           method: 'POST',
           body: formData,
@@ -79,11 +109,14 @@ function App() {
           body: JSON.stringify({ cifra_text: cifraText, action, interval }),
         });
       }
+
       if (!response.ok) throw new Error('A resposta da API não foi bem-sucedida.');
       const data = await response.json();
       setTransposedCifra(data.transposed_cifra);
+
     } catch (err) {
-      setError('Falha ao se comunicar com a API. Verifique se o back-end Python está rodando.');
+      // Aqui poderíamos implementar uma versão offline para texto puro no futuro
+      setError('O servidor Render está "dormindo" ou indisponível. Para Cifras Completas e Arquivos, precisamos do servidor online. Tente novamente em 1 minuto ou use a aba "Sequência" (que funciona offline).');
     } finally {
       setIsLoading(false);
     }
@@ -117,6 +150,7 @@ function App() {
     }
   };
 
+  // Drag and Drop Handlers
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -169,7 +203,7 @@ function App() {
     >
       {isDragging && <DragDropOverlay />}
 
-      <h1>🎵 Transpositor Universal de Acordes!</h1>
+      <h1>🎵 Transpositor Universal de Acordes</h1>
 
       <div className="controls">
         <h2>1. Escolha a Transposição</h2>
@@ -217,6 +251,13 @@ function App() {
           <button className="main-button" style={{ marginTop: '15px' }} onClick={handleSequenceTranspose} disabled={isLoading}>
             {isLoading ? 'Transpondo...' : 'Transpor Sequência!'}
           </button>
+
+          {/* Feedback Visual do Modo Offline */}
+          {usingOfflineMode && sequenceResult && (
+            <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
+              ⚠️ Servidor indisponível. Usando cálculo local (Offline).
+            </p>
+          )}
 
           {sequenceResult && (
             <div className="result-area">
