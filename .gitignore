@@ -26,3 +26,8 @@ dist-ssr
 # Ignorar arquivos de sistema do Windows
 desktop.ini
 Thumbs.db
+
+# Python / Backend
+venv/
+__pycache__/
+.env

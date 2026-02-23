@@ -5,9 +5,11 @@ import mammoth from 'mammoth';
 import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
 import DragDropOverlay from './DragDropOverlay';
+import GeradorEscala from './GeradorEscala';
 // Importamos a lógica local para usar APENAS se a API falhar
 import { calcularSequenciaLocal, processarCifraCompleta } from './musicLogic';
 import './App.css';
+import GestaoMembros from './GestaoMembros'; // <-- Adicione esta linha junto com as outras importações
 
 // URL da sua API no Render
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://transpor-acordes-react-api.onrender.com';
@@ -35,6 +37,8 @@ function App() {
 
   const dragCounter = useRef(0);
   const fileStatusRef = useRef(null);
+
+  const [appMode, setAppMode] = useState('transpositor');
 
   useEffect(() => {
     if (selectedFile && fileStatusRef.current) {
@@ -249,143 +253,184 @@ function App() {
     <div className="App" onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
       {isDragging && <DragDropOverlay />}
 
-      <h1>🎵 Transpositor Universal de Acordes</h1>
+      {/* Título unificado do App */}
+      <h1>Sistema de Louvor</h1>
 
-      <div className="controls">
-        <h2>1. Escolha a Transposição</h2>
-        <div className="controls-grid">
-          <div className="action-control">
-            <label>Ação</label>
-            <ToggleSwitch options={actionOptions} selectedValue={action} onChange={setAction} />
-          </div>
-          <div className="interval-control">
-            <label>Intervalo (em tons)</label>
-            <NumberInput value={interval} onChange={setInterval} step={0.5} min={0.5} />
-          </div>
-        </div>
+      {/* --- MENU PRINCIPAL ATUALIZADO --- */}
+      <div className="main-nav">
+        <button
+          className={appMode === 'transpositor' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setAppMode('transpositor')}
+        >
+          🎵 Transpositor
+        </button>
+        <button
+          className={appMode === 'escala' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setAppMode('escala')}
+        >
+          📅 Gerador de Escalas
+        </button>
+        <button
+          className={appMode === 'membros' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setAppMode('membros')}
+        >
+          👥 Gestão de Membros
+        </button>
       </div>
 
-      <div className="tabs">
-        <button className={`tab-button ${activeTab === 'sequence' ? 'active' : ''}`} onClick={() => setActiveTab('sequence')}>
-          Transpor Sequência
-        </button>
-        <button className={`tab-button ${activeTab === 'cifra' ? 'active' : ''}`} onClick={() => setActiveTab('cifra')}>
-          Transpor Cifra Completa
-        </button>
-      </div>
+      {/* --- LÓGICA DE ALTERNÂNCIA DE TELAS --- */}
+      {appMode === 'transpositor' && (
+        <>
+          <h2 style={{ textAlign: 'center', color: '#61dafb', marginBottom: '20px', borderBottom: 'none' }}>
+            🎵 Transpositor Universal de Acordes
+          </h2>
 
-      {activeTab === 'sequence' && (
-        <div className="input-area">
-          <h2>2. Insira a Sequência de Acordes</h2>
-          <p className="tab-description">Use esta aba para transpor uma lista simples de acordes separados por espaço.</p>
-          <input
-            type="text"
-            className="sequence-input"
-            placeholder="Ex: G D/F# Em C"
-            value={sequenceText}
-            onChange={(e) => setSequenceText(e.target.value)}
-          />
-          <button className="main-button" style={{ marginTop: '15px' }} onClick={handleSequenceTranspose} disabled={isLoading}>
-            {isLoading ? 'Processando...' : 'Transpor Sequência!'}
-          </button>
+          <div className="controls">
+            <h2>1. Escolha a Transposição</h2>
+            <div className="controls-grid">
+              <div className="action-control">
+                <label>Ação</label>
+                <ToggleSwitch options={actionOptions} selectedValue={action} onChange={setAction} />
+              </div>
+              <div className="interval-control">
+                <label>Intervalo (em tons)</label>
+                <NumberInput value={interval} onChange={setInterval} step={0.5} min={0.5} />
+              </div>
+            </div>
+          </div>
 
-          {/* AVISO DE MODO OFFLINE */}
-          {usingOfflineMode && sequenceResult && (
-            <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
-              ⚠️ API Render indisponível. Cálculo realizado offline.
-            </p>
-          )}
+          <div className="tabs">
+            <button className={`tab-button ${activeTab === 'sequence' ? 'active' : ''}`} onClick={() => setActiveTab('sequence')}>
+              Transpor Sequência
+            </button>
+            <button className={`tab-button ${activeTab === 'cifra' ? 'active' : ''}`} onClick={() => setActiveTab('cifra')}>
+              Transpor Cifra Completa
+            </button>
+          </div>
 
-          {sequenceResult && (
-            <div className="result-area">
-              <h2>🎸 Resultado da Sequência</h2>
-              <div className="sequence-results-grid">
-                {sequenceResult.original_chords.map((original, index) => (
-                  <div key={index} className="chord-card">
-                    <div className="original">{original}</div>
-                    <div className="transposed">{sequenceResult.transposed_chords[index]}</div>
+          {activeTab === 'sequence' && (
+            <div className="input-area">
+              <h2>2. Insira a Sequência de Acordes</h2>
+              <p className="tab-description">Use esta aba para transpor uma lista simples de acordes separados por espaço.</p>
+              <input
+                type="text"
+                className="sequence-input"
+                placeholder="Ex: G D/F# Em C"
+                value={sequenceText}
+                onChange={(e) => setSequenceText(e.target.value)}
+              />
+              <button className="main-button" style={{ marginTop: '15px' }} onClick={handleSequenceTranspose} disabled={isLoading}>
+                {isLoading ? 'Processando...' : 'Transpor Sequência!'}
+              </button>
+
+              {/* AVISO DE MODO OFFLINE */}
+              {usingOfflineMode && sequenceResult && (
+                <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
+                  ⚠️ API Render indisponível. Cálculo realizado offline.
+                </p>
+              )}
+
+              {sequenceResult && (
+                <div className="result-area">
+                  <h2>🎸 Resultado da Sequência</h2>
+                  <div className="sequence-results-grid">
+                    {sequenceResult.original_chords.map((original, index) => (
+                      <div key={index} className="chord-card">
+                        <div className="original">{original}</div>
+                        <div className="transposed">{sequenceResult.transposed_chords[index]}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="copy-block">
-                Originais:   {sequenceResult.original_chords.join(' ')}<br />
-                Transpostos: {sequenceResult.transposed_chords.join(' ')}
-              </div>
-              {sequenceResult.explanations.length > 0 && (
-                <div style={{ marginTop: '15px' }}>
-                  <h4>ℹ️ Informações Adicionais</h4>
-                  {sequenceResult.explanations.map((exp, i) => <p key={i} className="explanation-text">{exp}</p>)}
+                  <div className="copy-block">
+                    Originais:   {sequenceResult.original_chords.join(' ')}<br />
+                    Transpostos: {sequenceResult.transposed_chords.join(' ')}
+                  </div>
+                  {sequenceResult.explanations.length > 0 && (
+                    <div style={{ marginTop: '15px' }}>
+                      <h4>ℹ️ Informações Adicionais</h4>
+                      {sequenceResult.explanations.map((exp, i) => <p key={i} className="explanation-text">{exp}</p>)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
-        </div>
-      )}
 
-      {activeTab === 'cifra' && (
-        <>
-          <div className="input-area">
-            <h2>2. Insira a Cifra</h2>
-            <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo em qualquer lugar da tela.</p>
-            <textarea
-              className="cifra-textarea"
-              placeholder="Ex:&#10;D G A&#10;Minha canção..."
-              value={cifraText}
-              onChange={(e) => {
-                setCifraText(e.target.value);
-                if (selectedFile) {
-                  setSelectedFile(null);
-                  if (document.getElementById('file-upload')) document.getElementById('file-upload').value = null;
-                }
-              }}
-            />
-            <div className="file-input-wrapper">
-              <label htmlFor="file-upload" className="file-input-label">
-                Ou Selecione um Arquivo (.txt, .docx)
-              </label>
-              <input id="file-upload" type="file" onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  if (file.name.endsWith('.txt') || file.name.endsWith('.docx')) {
-                    setSelectedFile(file);
-                    setCifraText('');
-                    setError('');
-                  } else {
-                    setError('Formato inválido. Use .txt ou .docx');
+          {activeTab === 'cifra' && (
+            <>
+              <div className="input-area">
+                <h2>2. Insira a Cifra</h2>
+                <p className="tab-description">Cole o texto abaixo OU arraste e solte um arquivo em qualquer lugar da tela.</p>
+                <textarea
+                  className="cifra-textarea"
+                  placeholder="Ex:&#10;D G A&#10;Minha canção..."
+                  value={cifraText}
+                  onChange={(e) => {
+                    setCifraText(e.target.value);
+                    if (selectedFile) {
+                      setSelectedFile(null);
+                      if (document.getElementById('file-upload')) document.getElementById('file-upload').value = null;
+                    }
+                  }}
+                />
+                <div className="file-input-wrapper">
+                  <label htmlFor="file-upload" className="file-input-label">
+                    Ou Selecione um Arquivo (.txt, .docx)
+                  </label>
+                  <input id="file-upload" type="file" onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      if (file.name.endsWith('.txt') || file.name.endsWith('.docx')) {
+                        setSelectedFile(file);
+                        setCifraText('');
+                        setError('');
+                      } else {
+                        setError('Formato inválido. Use .txt ou .docx');
+                      }
+                    }
+                  }} accept=".txt,.docx" />
+                  {selectedFile &&
+                    <p ref={fileStatusRef} className="file-selected-feedback">
+                      Arquivo selecionado: {selectedFile.name}
+                    </p>
                   }
-                }
-              }} accept=".txt,.docx" />
-              {selectedFile &&
-                <p ref={fileStatusRef} className="file-selected-feedback">
-                  Arquivo selecionado: {selectedFile.name}
-                </p>
-              }
-            </div>
-          </div>
-
-          <button className="main-button" onClick={handleCifraTranspose} disabled={isLoading || (!cifraText && !selectedFile)}>
-            {isLoading ? 'Processando...' : 'Transpor Cifra!'}
-          </button>
-
-          {/* AVISO DE MODO OFFLINE NA CIFRA */}
-          {usingOfflineMode && transposedCifra && (
-            <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
-              ⚠️ API Render indisponível. Arquivo processado localmente.
-            </p>
-          )}
-
-          {transposedCifra && (
-            <div className="result-area">
-              <h2>🎸 Cifra Transposta</h2>
-              <pre>{transposedCifra}</pre>
-              <div className="result-actions">
-                <button onClick={handleCopy}>{isCopied ? 'Copiado!' : 'Copiar'}</button>
-                <button onClick={handleDownload}>Baixar (.txt)</button>
-                <button onClick={handleClearCifra}>Limpar</button>
+                </div>
               </div>
-            </div>
+
+              <button className="main-button" onClick={handleCifraTranspose} disabled={isLoading || (!cifraText && !selectedFile)}>
+                {isLoading ? 'Processando...' : 'Transpor Cifra!'}
+              </button>
+
+              {/* AVISO DE MODO OFFLINE NA CIFRA */}
+              {usingOfflineMode && transposedCifra && (
+                <p style={{ fontSize: '0.9em', color: '#ffd700', textAlign: 'center', marginTop: '10px', backgroundColor: 'rgba(255, 215, 0, 0.1)', padding: '5px', borderRadius: '4px', border: '1px solid #ffd700' }}>
+                  ⚠️ API Render indisponível. Arquivo processado localmente.
+                </p>
+              )}
+
+              {transposedCifra && (
+                <div className="result-area">
+                  <h2>🎸 Cifra Transposta</h2>
+                  <pre>{transposedCifra}</pre>
+                  <div className="result-actions">
+                    <button onClick={handleCopy}>{isCopied ? 'Copiado!' : 'Copiar'}</button>
+                    <button onClick={handleDownload}>Baixar (.txt)</button>
+                    <button onClick={handleClearCifra}>Limpar</button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
+      )}
+
+      {/* --- LÓGICA DAS OUTRAS TELAS --- */}
+      {appMode === 'escala' && (
+        <GeradorEscala />
+      )}
+
+      {appMode === 'membros' && (
+        <GestaoMembros />
       )}
 
       {error && <p style={{ color: '#ff4b4b', textAlign: 'center', marginTop: '15px' }}>{error}</p>}
