@@ -252,14 +252,14 @@ function GeradorEscala() {
         </div>
 
         <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#282c34', borderRadius: '8px', border: '1px dashed #61dafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-          <div>
-            <strong style={{ color: '#61dafb' }}>Dias gerados: </strong>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
+            <strong style={{ color: '#61dafb' }}>Dias da escala: </strong>
             {datasEscala.map((data, idx) => (
-              <span key={idx} style={{ marginLeft: '10px', backgroundColor: '#4a505c', padding: '3px 10px', borderRadius: '15px', fontSize: '0.9em' }}>
+                <span key={idx} style={{ backgroundColor: '#4a505c', padding: '3px 10px', borderRadius: '15px', fontSize: '0.9em', whiteSpace: 'nowrap' }}>
                 {formatDataDDMM(data)}
-              </span>
+                </span>
             ))}
-          </div>
+            </div>
           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0, fontWeight: 'bold' }}>
             <input type="checkbox" checked={incluirCriancas} onChange={(e) => setIncluirCriancas(e.target.checked)} style={{ width: '20px', height: '20px', marginRight: '10px' }}/>
             Incluir Escala das Crianças

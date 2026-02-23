@@ -1,4 +1,9 @@
 /* src/App.css */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 body {
   background-color: #282c34;
   color: white;
@@ -312,38 +317,68 @@ pre {
     margin: 0;
 }
 
-/* --- Media Query para Telas Pequenas (Responsividade) --- */
+/* --- Media Query para Telas Pequenas (Responsividade no Celular) --- */
 @media (max-width: 600px) {
 
-  /* Ajusta o padding geral da aplicação para telas menores */
   .App {
-    padding: 15px;
-    margin-top: 20px;
+    padding: 10px;
+    margin-top: 10px;
+    width: 100%;
   }
 
-  /* Diminui o título principal no celular */
-  h1 {
-    font-size: 2em;
-  }
+  h1 { font-size: 1.8em; }
 
-  /* A MÁGICA ACONTECE AQUI */
-  /* Muda o layout do grid de controles para uma coluna vertical */
+  /* 1. Transforma o menu superior em botões empilhados */
+  .main-nav {
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 15px;
+  }
+  .nav-btn { width: 100%; }
+
+  /* 2. Resolve o vazamento dos inputs e controles */
   .controls-grid {
-    flex-direction: column; /* Empilha os itens verticalmente */
-    align-items: stretch;   /* Faz os itens ocuparem a largura total */
-    gap: 30px;              /* Aumenta o espaço vertical entre eles */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+  }
+  
+  .action-control, .interval-control {
+    align-items: stretch; 
   }
 
-  /* Garante que os controles internos mantenham o alinhamento centralizado */
-  .action-control,
-  .interval-control {
-    align-items: center; 
+  /* 3. Domando as Tabelas (Ativa o "arrastar para o lado") */
+  .input-area, .result-area {
+    padding: 15px 10px;
+    width: 100%;
+    overflow-x: auto; /* Permite rolar a área se o conteúdo for largo */
   }
 
-  /* Ajusta o tamanho da fonte do resultado para caber melhor */
-  .copy-block {
-    font-size: 1.1em;
-    line-height: 1.6;
+  #escala-resultado-matriz {
+    overflow-x: auto;
+    padding: 10px !important;
+  }
+
+  /* Força a tabela a manter um tamanho mínimo legível, ativando o scroll do container acima */
+  .escala-matrix {
+    min-width: 550px; 
+  }
+
+  /* 4. Ajustes nos selects e botões (ex: "Adicionar", "Imprimir") para não esmagarem */
+  select, input[type="text"], input[type="number"], input[type="email"] {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+
+  /* Empilha o bloco de Imprimir e WhatsApp */
+  .result-area > div[style*="justify-content: center"] {
+    flex-direction: column;
+    gap: 10px !important;
+  }
+
+  .result-area > div[style*="justify-content: center"] button {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -464,4 +499,14 @@ pre {
 .modal-content::-webkit-scrollbar-thumb {
   background-color: #4a505c;
   border-radius: 4px;
+}
+
+/* Limita a largura da primeira coluna nas tabelas (Membro/Funções) */
+.escala-matrix th:first-child,
+.escala-matrix td:first-child {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  white-space: normal;
+  word-wrap: break-word;
 }
