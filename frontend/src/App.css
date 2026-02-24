@@ -510,3 +510,283 @@ pre {
   white-space: normal;
   word-wrap: break-word;
 }
+
+/* --- ESTILOS DO CHAT (LEVIROBOTO) --- */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 60vh;
+  min-height: 500px;
+  background-color: #1e2229;
+  border-radius: 12px;
+  border: 1px solid #4a505c;
+  overflow: hidden;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.chat-bubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.4;
+  font-size: 1.05em;
+}
+
+.bubble-bot {
+  background-color: #2c3038;
+  color: #eafcff;
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+  border: 1px solid #3c414d;
+}
+
+.bubble-user {
+  background-color: #2ecc71;
+  color: #1e2229;
+  font-weight: bold;
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-shortcuts {
+  display: flex;
+  gap: 10px;
+  padding: 10px 15px;
+  background-color: #282c34;
+  border-top: 1px solid #3c414d;
+  overflow-x: auto;
+}
+
+.chat-shortcuts button {
+  background-color: transparent;
+  color: #61dafb;
+  border: 1px solid #61dafb;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.chat-shortcuts button:hover {
+  background-color: rgba(97, 218, 251, 0.1);
+}
+
+/* Área de Input de Texto (Com Input Curvado) */
+.chat-input-area {
+  display: flex;
+  padding: 15px 20px;
+  background-color: #282c34;
+  border-top: 1px solid #3c414d;
+  gap: 12px;
+  align-items: center;
+}
+
+/* O container que abraça o botão de menu e o campo de texto juntos */
+.input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background-color: #1e2229;
+  border: 1px solid #4a505c;
+  border-radius: 30px; /* A CURVINHA PERFEITA (PILL SHAPE) */
+  padding: 4px 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: #61dafb;
+  box-shadow: 0 0 0 3px rgba(97, 218, 251, 0.2);
+}
+
+/* Botão Hambúrguer (Bolinha Colorida) */
+.menu-btn {
+  background-color: #61dafb; /* A cor azul de destaque */
+  border: none;
+  color: #1e2229; /* Ícone escuro para contraste */
+  font-size: 1.2em;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%; /* Transforma num círculo perfeito */
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(97, 218, 251, 0.3); /* Sombra elegante na bolinha */
+  margin-right: 5px; /* Empurra o texto levemente para a direita */
+}
+
+.menu-btn:hover {
+  background-color: #4fa8c8;
+  transform: scale(1.05); /* Cresce um pouquinho ao passar o mouse */
+}
+
+.menu-btn.active {
+  background-color: #3a6b7e;
+  color: white;
+}
+
+/* O input fica invisível dentro do wrapper arredondado */
+.chat-input-with-menu {
+  flex: 1;
+  padding: 10px 10px 10px 5px;
+  border: none;
+  background: transparent;
+  color: white;
+  outline: none;
+  font-size: 1.05em;
+}
+
+/* Botão Enviar (➤) */
+.chat-send-btn {
+  background-color: #61dafb;
+  color: #1e2229;
+  border: none;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2em;
+  transition: transform 0.1s;
+}
+
+.chat-send-btn:active {
+  transform: scale(0.95);
+}
+
+.chat-send-btn:disabled {
+  background-color: #4a505c;
+  color: #9ab;
+  cursor: not-allowed;
+}
+
+/* --- ANIMAÇÃO E ESTILO DO POPOVER (SHADCN UI VIBES) --- */
+
+@keyframes popoverSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.command-popup {
+  position: absolute;
+  bottom: calc(100% + 15px); /* Flutua acima do input */
+  left: 0;
+  width: 320px;
+  max-width: 90vw;
+  max-height: 350px;
+  overflow-y: auto;
+  
+  /* Visual Premium com Blur */
+  background-color: rgba(30, 34, 41, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.7), 0 0 15px rgba(0,0,0,0.2);
+  
+  z-index: 100;
+  padding: 8px;
+  
+  /* Animação */
+  animation: popoverSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: bottom left;
+}
+
+.command-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
+}
+
+.command-item:last-child {
+  margin-bottom: 0;
+}
+
+.command-item:hover {
+  background-color: rgba(97, 218, 251, 0.1);
+  padding-left: 16px; /* Desliza charmosamente pro lado */
+}
+
+.command-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.command-item.disabled:hover {
+  background-color: transparent;
+  padding-left: 12px;
+}
+
+.cmd-name {
+  font-weight: 800;
+  color: #61dafb;
+  font-size: 0.95em;
+  margin-bottom: 3px;
+}
+
+.cmd-desc {
+  color: #c8d1d9;
+  font-size: 0.85em;
+  opacity: 0.9;
+}
+
+/* Scrollbar do Popover */
+.command-popup::-webkit-scrollbar {
+  width: 4px;
+}
+.command-popup::-webkit-scrollbar-thumb {
+  background-color: #4a505c;
+  border-radius: 4px;
+}
+
+/* --- LINKS CLICÁVEIS DENTRO DAS MENSAGENS --- */
+.clickable-command {
+  color: #61dafb;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: opacity 0.2s, background-color 0.2s;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.clickable-command:hover {
+  background-color: rgba(97, 218, 251, 0.15);
+  opacity: 0.9;
+}
+
+/* Garante que o texto fique legível mesmo se o usuário digitar o comando */
+.bubble-user .clickable-command {
+  color: #1e2229;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+.bubble-user .clickable-command:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}

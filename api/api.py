@@ -10,10 +10,11 @@ import io
 from typing import List, Optional
 import os
 import libsql_client
+import random
+import difflib
+import gspread
 
 # --- Configuração do Banco de Dados Turso ---
-# Usando as variáveis de ambiente com um "fallback" para as suas credenciais diretas, 
-# garantindo que rode liso localmente e também no Render depois.
 TURSO_URL = os.getenv("TURSO_DATABASE_URL", "https://levi-roboto-db-rfpanfil.aws-us-east-2.turso.io")
 TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzE4NjIxODIsImlkIjoiMzZkMGNlYmItZDIwMS00NWU1LWI0ZTgtMDk5MmJhNWUzZTVlIiwicmlkIjoiMzZjYTljZjQtNmE0Ny00MDc4LTk5NWItYzY5YWJiY2FmMjA3In0.ctX09Go_KYD8wUFulZpRm8JSLHHRL1Ou44yualixomTUvSAx2x164BASeB-WfJRatV6JXcKRIF1U4wzCQwF9Cg")
 
@@ -149,7 +150,6 @@ async def delete_funcao(funcao_id: int):
     except Exception as e:
         return {"error": str(e)}
 
-
 # --- Modelos de Dados para Gestão de Membros ---
 class MembroRequest(BaseModel):
     nome: str
@@ -217,8 +217,6 @@ async def delete_membro(membro_id: int):
     except Exception as e:
         return {"error": str(e)}
 
-
-
 # ==========================================================
 # CÓDIGO DO TRANSPOSITOR (Mantido Intacto)
 # ==========================================================
@@ -284,7 +282,6 @@ def transpor_acordes_sequencia(acordes_originais, acao, intervalo):
             continue
         
         nota_bruta, resto = match.groups()
-        
         nota_fundamental = normalizar_nota(nota_bruta, explicacoes_entrada)
         
         if nota_fundamental == nota_bruta:
@@ -378,6 +375,91 @@ async def transpose_file_endpoint(file: UploadFile = File(...), action: str = Fo
     texto = await ler_conteudo_arquivo(file)
     res = processar_cifra(texto, action, interval)
     return {"transposed_cifra": res}
+
+# ==========================================================
+# ROTAS DO LEVIROBOTO (REPERTÓRIO E BUSCA)
+# ==========================================================
+
+@app.get("/musicas/buscar")
+async def buscar_musicas(q: str):
+    """Opção 1: Busca músicas por palavra-chave (EXATAMENTE como o bot original)"""
+    try:
+        client = get_db_client()
+        result = await client.execute("SELECT nome_musica, tags FROM biblioteca_busca")
+        await client.close()
+        
+        q_lower = q.lower().strip()
+        
+        todas_tags = set()
+        for row in result.rows:
+            tags = [t.strip().lower() for t in row[1].split(',') if t.strip()]
+            todas_tags.update(tags)
+            
+        closest_word = q_lower
+        matches = difflib.get_close_matches(q_lower, list(todas_tags), n=1, cutoff=0.6)
+        if matches:
+            closest_word = matches[0]
+            
+        musicas_encontradas = []
+        for row in result.rows:
+            nome = row[0] 
+            tags = [t.strip().lower() for t in row[1].split(',')]
+            
+            if closest_word in tags or closest_word in nome.lower():
+                musicas_encontradas.append(nome)
+                
+        random.shuffle(musicas_encontradas)
+        MAX_MUSICAS = 10 # Corrigido para 10 igual ao seu código raiz!
+        
+        return {
+            "closest_word": closest_word,
+            "resultados": musicas_encontradas[:MAX_MUSICAS]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/musicas/sortear")
+async def sortear_musica():
+    """Opção 2: Consulta as 6 tabelas originais na nuvem"""
+    try:
+        client = get_db_client()
+        
+        async def pegar_aleatoria(tabela):
+            try:
+                res = await client.execute(f"SELECT conteudo FROM {tabela} ORDER BY RANDOM() LIMIT 1")
+                return res.rows[0][0] if res.rows else "Nenhuma música cadastrada."
+            except:
+                return "Erro ao buscar."
+
+        resultado = {
+            "agitadas1": await pegar_aleatoria("agitadas1"),
+            "agitadas2": await pegar_aleatoria("agitadas2"), 
+            "lentas1": await pegar_aleatoria("lentas1"),
+            "lentas2": await pegar_aleatoria("lentas2"),
+            "ceia": await pegar_aleatoria("ceia"),
+            "infantis": await pegar_aleatoria("infantis")
+        }
+        await client.close()
+        return resultado
+    except Exception as e:
+        return {"error": str(e)}
+
+class SugestaoRequest(BaseModel):
+    usuario: str
+    sugestao: str
+
+@app.post("/musicas/sugerir")
+async def sugerir_musica(req: SugestaoRequest):
+    """Opção 3: Salva direto no Google Sheets"""
+    try:
+        # Usa o arquivo credentials.json que deve estar na mesma pasta do api.py
+        gc = gspread.service_account(filename="credentials.json")
+        sh = gc.open("Sugestões de músicas LeviRoboto")
+        worksheet = sh.sheet1
+        worksheet.append_row([req.usuario, req.sugestao])
+        return {"message": "Sucesso"}
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

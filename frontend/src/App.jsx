@@ -6,6 +6,7 @@ import NumberInput from './NumberInput';
 import ToggleSwitch from './ToggleSwitch';
 import DragDropOverlay from './DragDropOverlay';
 import GeradorEscala from './GeradorEscala';
+import LeviRoboto from './LeviRoboto';
 // Importamos a lógica local para usar APENAS se a API falhar
 import { calcularSequenciaLocal, processarCifraCompleta } from './musicLogic';
 import './App.css';
@@ -276,6 +277,12 @@ function App() {
         >
           👥 Gestão de Membros
         </button>
+        <button
+          className={appMode === 'repertorio' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setAppMode('repertorio')}
+        >
+          🤖 Levi Roboto
+        </button>
       </div>
 
       {/* --- LÓGICA DE ALTERNÂNCIA DE TELAS --- */}
@@ -431,6 +438,10 @@ function App() {
 
       {appMode === 'membros' && (
         <GestaoMembros />
+      )}
+
+      {appMode === 'repertorio' && (
+        <LeviRoboto />
       )}
 
       {error && <p style={{ color: '#ff4b4b', textAlign: 'center', marginTop: '15px' }}>{error}</p>}
