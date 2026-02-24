@@ -13,6 +13,7 @@ import libsql_client
 import random
 import difflib
 import gspread
+import json
 
 # --- Configuração do Banco de Dados Turso ---
 TURSO_URL = os.getenv("TURSO_DATABASE_URL", "https://levi-roboto-db-rfpanfil.aws-us-east-2.turso.io")
@@ -450,15 +451,24 @@ class SugestaoRequest(BaseModel):
 
 @app.post("/musicas/sugerir")
 async def sugerir_musica(req: SugestaoRequest):
-    """Opção 3: Salva direto no Google Sheets"""
+    """Opção 3: Salva no Google Sheets (Seguro para Nuvem e Local)"""
     try:
-        # Usa o arquivo credentials.json que deve estar na mesma pasta do api.py
-        gc = gspread.service_account(filename="credentials.json")
+        google_creds_env = os.getenv("GOOGLE_CREDENTIALS")
+        
+        # 1. Se estiver no RENDER, ele usa a Variável de Ambiente secreta
+        if google_creds_env:
+            creds_dict = json.loads(google_creds_env)
+            gc = gspread.service_account_from_dict(creds_dict)
+        # 2. Se estiver no seu PC, ele usa o arquivo invisível pro Github
+        else:
+            gc = gspread.service_account(filename="credentials.json")
+            
         sh = gc.open("Sugestões de músicas LeviRoboto")
         worksheet = sh.sheet1
         worksheet.append_row([req.usuario, req.sugestao])
         return {"message": "Sucesso"}
     except Exception as e:
+        print(f"❌ ERRO GRAVE NO SHEETS: {e}") 
         return {"error": str(e)}
 
 if __name__ == "__main__":

@@ -56,15 +56,15 @@ function LeviRoboto() {
     }
   };
 
-  // --- O CÉREBRO DA INTERAÇÃO CLICÁVEL CORRIGIDO ---
+  // --- O CÉREBRO DA INTERAÇÃO (Comandos + Links) ---
   const formatarMensagem = (text) => {
-    // Regex EXATO: Só captura se for exatamente os comandos do bot.
-    // Isso impede que links do Youtube como "youtu.be/xxx" sejam divididos e clicados!
-    const regex = /(\/(?:start|cancel|opcao1|opcao2|opcao3|opcao4|opcao5))/gi;
+    // Procura por comandos EXATOS do bot OU por links http/https
+    const regex = /(\/(?:start|cancel|opcao1|opcao2|opcao3|opcao4|opcao5)|https?:\/\/[^\s]+)/gi;
     const partes = text.split(regex);
     
     return partes.map((parte, index) => {
-      if (parte.match(regex)) {
+      // Se for um comando do bot:
+      if (parte.match(/^\/(?:start|cancel|opcao1|opcao2|opcao3|opcao4|opcao5)$/i)) {
         return (
           <span 
             key={index} 
@@ -75,7 +75,22 @@ function LeviRoboto() {
             {parte}
           </span>
         );
+      } 
+      // Se for um Link da Web (YouTube, etc):
+      else if (parte.match(/^https?:\/\/[^\s]+/i)) {
+        return (
+          <a 
+            key={index} 
+            href={parte} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="clickable-link"
+          >
+            {parte}
+          </a>
+        );
       }
+      // Se for texto normal:
       return <span key={index}>{parte}</span>;
     });
   };

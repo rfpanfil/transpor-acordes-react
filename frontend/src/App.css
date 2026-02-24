@@ -790,3 +790,18 @@ pre {
 .bubble-user .clickable-command:hover {
   background-color: rgba(0, 0, 0, 0.2);
 }
+
+/* --- Links externos (YouTube) dentro do Chat --- */
+.clickable-link {
+  color: #2ecc71; /* Verde brilhante para destacar */
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.clickable-link:hover {
+  opacity: 0.8;
+}
+
+.bubble-user .clickable-link {
+  color: #1e2229; /* Escuro no balão do usuário */
+}

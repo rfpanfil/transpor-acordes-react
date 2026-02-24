@@ -31,3 +31,5 @@ Thumbs.db
 venv/
 __pycache__/
 .env
+
+credentials.json

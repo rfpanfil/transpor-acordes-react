@@ -4,3 +4,5 @@ pydantic
 python-multipart
 python-docx
 libsql-client
+gspread
+oauth2client
