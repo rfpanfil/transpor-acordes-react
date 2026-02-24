@@ -18,16 +18,47 @@ export const gerarEscalas = (equipa, datasEscala, indisponibilidades, regras, va
   while (resultadosObj.length < 10 && tentativasTotais < 50) {
     tentativasTotais++;
     let encontrouNestaTentativa = false;
+    let limitadorAntiTravamento = 0; // NOVO: Disjuntor de segurança
 
     const backtrack = (diaIndex, escalaAtual) => {
       if (encontrouNestaTentativa) return; 
       
+      limitadorAntiTravamento++;
+      if (limitadorAntiTravamento > 25000) {
+        encontrouNestaTentativa = true; // Se testou 25.000 combinações e não achou, aborta para não travar o PC
+        return;
+      }
+      
       if (diaIndex === datasEscala.length) {
-        const jsonStr = JSON.stringify(escalaAtual);
-        if (!resultadosUnicos.has(jsonStr)) {
-          resultadosUnicos.add(jsonStr);
-          resultadosObj.push(JSON.parse(jsonStr));
-          encontrouNestaTentativa = true;
+        
+        // Antes de salvar, verifica se a escala atendeu as metas mensais de frequência
+        let todasAsFrequenciasCumpridas = true;
+        
+        for (let regra of regras) {
+          if (regra.tipo === 'frequencia') {
+            let contagemOficial = 0;
+            for (let d in escalaAtual) {
+              // Correção: Adicionado 'a.membro.id &&' para evitar erro quando a vaga estiver vazia ('---')
+              if (escalaAtual[d].some(a => a.membro && a.membro.id && a.membro.id.toString() === regra.membro1 && a.vaga.label === regra.funcao)) {
+                contagemOficial++;
+              }
+            }
+            // Se a quantidade não for EXATAMENTE a que você pediu, essa escala inteira é descartada
+            if (contagemOficial !== parseInt(regra.quantidade)) {
+              todasAsFrequenciasCumpridas = false;
+              break;
+            }
+          }
+        }
+
+        // Se passar por todas as provas, é salva!
+        if (todasAsFrequenciasCumpridas) {
+          const jsonStr = JSON.stringify(escalaAtual);
+          if (!resultadosUnicos.has(jsonStr)) {
+            resultadosUnicos.add(jsonStr);
+            resultadosObj.push(JSON.parse(jsonStr));
+            encontrouNestaTentativa = true;
+          }
         }
         return;
       }
@@ -57,6 +88,20 @@ export const gerarEscalas = (equipa, datasEscala, indisponibilidades, regras, va
         
         const isCandidatoValido = (membro, vagaAtual, alocados) => {
           if (indisponibilidades[`${membro.id}_${dataKey}`]) return false;
+
+          // NOVA BLINDAGEM: Verifica se o membro já bateu o limite de vezes definido na regra
+          const regraFreq = regras.find(r => r.tipo === 'frequencia' && r.membro1 === membro.id.toString() && r.funcao === vagaAtual.label);
+          if (regraFreq) {
+            let vezesQueJaTocou = 0;
+            // Conta quantas vezes ele já foi escalado nessa mesma função nos dias anteriores
+            for (let d in escalaAtual) {
+              if (escalaAtual[d].some(a => a.membro && a.membro.id === membro.id && a.vaga.label === vagaAtual.label)) {
+                vezesQueJaTocou++;
+              }
+            }
+            // Se já tocou o que foi pedido, ele está estritamente proibido de ser escolhido de novo pra essa função
+            if (vezesQueJaTocou >= parseInt(regraFreq.quantidade)) return false; 
+          }
 
           // 1. OBRIGATÓRIO: O membro tem que ter a função exata (ignorando maiúsculas/minúsculas para evitar bugs)
           const temFuncaoExata = membro.funcoes.some(f => vagaAtual.aceita.some(a => a.toLowerCase() === f.toLowerCase()));
@@ -91,14 +136,33 @@ export const gerarEscalas = (equipa, datasEscala, indisponibilidades, regras, va
         let candidatos = equipa.filter(m => isCandidatoValido(m, vaga, alocadosNesteDia));
 
         candidatos.sort((a, b) => {
-          // NOVA REGRA: Prioriza quem já está tocando no culto hoje (faz a dobra)
+          // 1. PRIORIDADE MÁXIMA: Regras de Frequência
+          // Se alguém precisa bater a cota desta função, passa na frente de todo mundo
+          const precisaVaga = (membroId) => {
+            const regra = regras.find(r => r.tipo === 'frequencia' && r.membro1 === membroId.toString() && r.funcao === vaga.label);
+            if (!regra) return 0;
+            let tocou = 0;
+            for (let d in escalaAtual) {
+              if (escalaAtual[d].some(aloc => aloc.membro && aloc.membro.id === membroId && aloc.vaga.label === vaga.label)) tocou++;
+            }
+            return parseInt(regra.quantidade) - tocou; // Quantas vezes ainda faltam
+          };
+
+          const aFalta = precisaVaga(a.id);
+          const bFalta = precisaVaga(b.id);
+          
+          if (aFalta > 0 && bFalta <= 0) return -1; // A precisa da vaga pra bater a meta
+          if (bFalta > 0 && aFalta <= 0) return 1;  // B precisa da vaga pra bater a meta
+          if (aFalta > 0 && bFalta > 0) return bFalta - aFalta; // Quem precisa de mais vagas agora, ganha
+
+          // 2. PRIORIDADE DE DOBRA: Prioriza quem já está tocando no culto hoje
           const aFazDobra = alocadosNesteDia.some(aloc => aloc.membro && aloc.membro.id === a.id);
           const bFazDobra = alocadosNesteDia.some(aloc => aloc.membro && aloc.membro.id === b.id);
           
-          if (aFazDobra && !bFazDobra) return -1; // A vai pro topo
-          if (!aFazDobra && bFazDobra) return 1;  // B vai pro topo
+          if (aFazDobra && !bFazDobra) return -1; 
+          if (!aFazDobra && bFazDobra) return 1;  
 
-          // Se empatar (ambos fazem dobra, ou nenhum faz), desempata por quem tocou menos no mês
+          // 3. EMPATE: Desempata por quem tocou menos no mês em geral
           const usoA = contarParticipacoes(a.id, escalaAtual);
           const usoB = contarParticipacoes(b.id, escalaAtual);
           if (usoA === usoB) return Math.random() - 0.5;

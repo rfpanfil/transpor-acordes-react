@@ -22,10 +22,30 @@ function GeradorEscala() {
   const [regras, setRegras] = useState([]);
   
   const [regraMembro1, setRegraMembro1] = useState('');
-  const [regraTipo, setRegraTipo] = useState('tocar_com'); 
+  const [regraTipo, setRegraTipo] = useState('frequencia'); // Definimos Frequência como padrão
   const [regraAlvo, setRegraAlvo] = useState('');
   const [regraAlvoData, setRegraAlvoData] = useState('');
+  const [regraFuncao, setRegraFuncao] = useState('');
+  const [regraQuantidade, setRegraQuantidade] = useState(1);
   const [regraError, setRegraError] = useState('');
+
+  // Lógica Dinâmica: Calcula quantos "Tickets" a pessoa tem. 
+  // Agora separa "Culto" (Adulto) e "Crianças" em contagens paralelas, pois permitem dobra no mesmo dia.
+  const getDiasDisponiveisMembro = (membroId, funcaoAlvo) => {
+    if (!membroId) return 0;
+    const totalDias = datasEscala.length;
+    const faltas = datasEscala.filter(d => indisponibilidades[`${membroId}_${formatDataKey(d)}`]).length;
+    
+    const isCrianca = (label) => label && label.includes('Crianças');
+    const alvoEhCrianca = isCrianca(funcaoAlvo);
+
+    const vagasComprometidas = regras
+      .filter(r => r.tipo === 'frequencia' && r.membro1 === membroId.toString())
+      .filter(r => isCrianca(r.funcao) === alvoEhCrianca) // Conta apenas as vagas da mesma categoria
+      .reduce((sum, r) => sum + parseInt(r.quantidade), 0);
+    
+    return totalDias - faltas - vagasComprometidas;
+  };
 
   const [escalasGeradas, setEscalasGeradas] = useState([]);
   const [escalaAtualIndex, setEscalaAtualIndex] = useState(0);
@@ -115,8 +135,13 @@ function GeradorEscala() {
     
     const novasVagas = {};
     
-    // PADRÕES BÁSICOS PARA INICIALIZAR O MÊS (Incluindo Voz 2 e Voz 3)
+    // PADRÕES BÁSICOS PARA INICIALIZAR O MÊS
     const padroes = ['Mídia', 'Voz e violão', 'Voz 1', 'Voz 2', 'Voz 3'];
+    
+    // Se a opção de crianças estiver ativada, já inclui elas no padrão do novo mês
+    if (incluirCriancas) {
+      padroes.push('Crianças - Voz e violão', 'Crianças - Voz 1');
+    }
 
     diasEncontrados.forEach(d => {
       const key = formatDataKey(d);
@@ -127,6 +152,8 @@ function GeradorEscala() {
     setIndisponibilidades({});
     setRegras([]);
     setEscalasGeradas([]); 
+    // A caixinha não será mais desmarcada e a seleção permanecerá
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mes, ano, diaSemanaAlvo, catalogoVagas]); // O reset acontece apenas quando o mês/ano muda!
 
   // --- EFEITO ÚNICO: ADICIONA/REMOVE AS CRIANÇAS SEM RESETAR A ESCALA ---
@@ -182,27 +209,34 @@ function GeradorEscala() {
 
   const adicionarRegra = () => {
     setRegraError(''); 
-    if (!regraMembro1 || !regraAlvo) { setRegraError('Por favor, preencha todos os campos.'); return; }
-    if (regraTipo === 'tocar_com_no_dia' && !regraAlvoData) { setRegraError('Por favor, selecione o dia.'); return; }
-    if ((regraTipo === 'tocar_com' || regraTipo === 'tocar_com_no_dia') && regraMembro1 === regraAlvo) { setRegraError('Um membro não pode ter regra consigo mesmo.'); return; }
-
     const membroNome = equipa.find(m => m.id.toString() === regraMembro1)?.nome;
     let descricao = '';
 
-    if (regraTipo === 'dia_especifico') {
-      if (indisponibilidades[`${regraMembro1}_${regraAlvo}`]) { setRegraError(`Impossível: ${membroNome} está de Falta.`); return; }
-      const [d, m] = regraAlvo.split('-');
-      descricao = `${membroNome} PRECISA tocar no dia ${d.padStart(2, '0')}/${String(parseInt(m) + 1).padStart(2, '0')}`;
-    } else if (regraTipo === 'tocar_com') {
-      descricao = `${membroNome} PRECISA tocar com ${equipa.find(m => m.id.toString() === regraAlvo)?.nome}`;
-    } else if (regraTipo === 'tocar_com_no_dia') {
-      if (indisponibilidades[`${regraMembro1}_${regraAlvoData}`] || indisponibilidades[`${regraAlvo}_${regraAlvoData}`]) { setRegraError(`Impossível: Alguém está de Falta.`); return; }
-      const [d, m] = regraAlvoData.split('-');
-      descricao = `${membroNome} PRECISA tocar com ${equipa.find(m => m.id.toString() === regraAlvo)?.nome} no dia ${d.padStart(2, '0')}/${String(parseInt(m) + 1).padStart(2, '0')}`;
+    if (regraTipo === 'frequencia') {
+      if (!regraMembro1 || !regraFuncao || !regraQuantidade) { setRegraError('Por favor, preencha todos os campos.'); return; }
+      descricao = `🎯 ${membroNome} PRECISA tocar EXATAMENTE ${regraQuantidade}x na função ${regraFuncao}`;
+    } else {
+      if (!regraMembro1 || !regraAlvo) { setRegraError('Por favor, preencha todos os campos.'); return; }
+      if (regraTipo === 'tocar_com_no_dia' && !regraAlvoData) { setRegraError('Por favor, selecione o dia.'); return; }
+      if ((regraTipo === 'tocar_com' || regraTipo === 'tocar_com_no_dia') && regraMembro1 === regraAlvo) { setRegraError('Um membro não pode ter regra consigo mesmo.'); return; }
+
+      if (regraTipo === 'dia_especifico') {
+        if (indisponibilidades[`${regraMembro1}_${regraAlvo}`]) { setRegraError(`Impossível: ${membroNome} está de Falta.`); return; }
+        const [d, m] = regraAlvo.split('-');
+        descricao = `${membroNome} PRECISA tocar no dia ${d.padStart(2, '0')}/${String(parseInt(m) + 1).padStart(2, '0')}`;
+      } else if (regraTipo === 'tocar_com') {
+        descricao = `${membroNome} PRECISA tocar com ${equipa.find(m => m.id.toString() === regraAlvo)?.nome}`;
+      } else if (regraTipo === 'tocar_com_no_dia') {
+        if (indisponibilidades[`${regraMembro1}_${regraAlvoData}`] || indisponibilidades[`${regraAlvo}_${regraAlvoData}`]) { setRegraError(`Impossível: Alguém está de Falta.`); return; }
+        const [d, m] = regraAlvoData.split('-');
+        descricao = `${membroNome} PRECISA tocar com ${equipa.find(m => m.id.toString() === regraAlvo)?.nome} no dia ${d.padStart(2, '0')}/${String(parseInt(m) + 1).padStart(2, '0')}`;
+      }
     }
 
-    setRegras([...regras, { id: Date.now(), membro1: regraMembro1, tipo: regraTipo, alvo: regraAlvo, alvoData: regraAlvoData, descricao }]);
-    setRegraMembro1(''); setRegraAlvo(''); setRegraAlvoData('');
+    setRegras([...regras, { id: Date.now(), membro1: regraMembro1, tipo: regraTipo, alvo: regraAlvo, alvoData: regraAlvoData, funcao: regraFuncao, quantidade: regraQuantidade, descricao }]);
+    
+    // Reseta o painel após adicionar
+    setRegraMembro1(''); setRegraAlvo(''); setRegraAlvoData(''); setRegraFuncao(''); setRegraQuantidade(1);
   };
 
   const removerRegra = (id) => setRegras(regras.filter(r => r.id !== id));
@@ -439,39 +473,88 @@ function GeradorEscala() {
             <h2>🔗 Regras Específicas (Opcional)</h2>
             <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div>
-                <label>Membro:</label>
-                <select value={regraMembro1} onChange={e => { setRegraMembro1(e.target.value); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
-                  <option value="">Selecione...</option>
-                  {equipa.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                </select>
-              </div>
-              <div>
-                <label>Regra:</label>
-                <select value={regraTipo} onChange={e => { setRegraTipo(e.target.value); setRegraAlvo(''); setRegraAlvoData(''); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
+                <label>Tipo de Regra:</label>
+                <select value={regraTipo} onChange={e => { 
+                    setRegraTipo(e.target.value); 
+                    setRegraMembro1(''); setRegraAlvo(''); setRegraAlvoData(''); setRegraFuncao(''); setRegraQuantidade(1); setRegraError(''); 
+                  }} style={{ padding: '8px', borderRadius: '5px' }}>
+                  <option value="frequencia">🎯 Controlar Quantidade Mensal</option>
                   <option value="tocar_com">PRECISA tocar com...</option>
                   <option value="dia_especifico">PRECISA tocar no dia...</option>
                   <option value="tocar_com_no_dia">PRECISA tocar com... no dia</option>
                 </select>
               </div>
-              <div>
-                <label>{regraTipo === 'dia_especifico' ? 'Dia Alvo:' : 'Membro Alvo:'}</label>
-                <select value={regraAlvo} onChange={e => { setRegraAlvo(e.target.value); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
-                  <option value="">Selecione...</option>
-                  {regraTipo === 'dia_especifico' 
-                    ? datasEscala.map((d, i) => <option key={i} value={formatDataKey(d)}>{formatDataDDMM(d)}</option>)
-                    : equipa.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)
-                  }
-                </select>
-              </div>
-              {regraTipo === 'tocar_com_no_dia' && (
-                <div>
-                  <label>No Dia:</label>
-                  <select value={regraAlvoData} onChange={e => { setRegraAlvoData(e.target.value); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
-                    <option value="">Selecione o Dia...</option>
-                    {datasEscala.map((d, i) => <option key={i} value={formatDataKey(d)}>{formatDataDDMM(d)}</option>)}
-                  </select>
-                </div>
+
+              {regraTipo === 'frequencia' ? (
+                <>
+                  <div>
+                    <label>Função:</label>
+                    <select value={regraFuncao} onChange={e => { setRegraFuncao(e.target.value); setRegraMembro1(''); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
+                      <option value="">Selecione a Função...</option>
+                      {[...new Set(Object.values(vagasPorDia).flat().map(v => v.label))].map((fLabel, i) => (
+                        <option key={i} value={fLabel}>{fLabel}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label>Membro:</label>
+                    <select value={regraMembro1} onChange={e => { setRegraMembro1(e.target.value); setRegraQuantidade(1); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }} disabled={!regraFuncao}>
+                      <option value="">Selecione o Membro...</option>
+                      {equipa.filter(m => {
+                        const temFuncao = regraFuncao ? m.funcoes.some(f => {
+                          const vagaCat = catalogoVagas.find(v => v.label === regraFuncao);
+                          return vagaCat && vagaCat.aceita.some(a => a.toLowerCase() === f.toLowerCase());
+                        }) : false;
+                        const temDiasLivres = getDiasDisponiveisMembro(m.id, regraFuncao) > 0;
+                        return temFuncao && temDiasLivres;
+                      }).map(m => (
+                        <option key={m.id} value={m.id}>{m.nome} (Livre: {getDiasDisponiveisMembro(m.id, regraFuncao)}x)</option>
+                      ))}
+                    </select>
+                  </div>
+                  {regraMembro1 && (
+                    <div>
+                      <label>Vezes:</label>
+                      <select value={regraQuantidade} onChange={e => { setRegraQuantidade(parseInt(e.target.value)); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
+                        {Array.from({ length: getDiasDisponiveisMembro(regraMembro1, regraFuncao) }, (_, i) => i + 1).map(num => (
+                          <option key={num} value={num}>{num} vez(es)</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* --- AS OUTRAS REGRAS CLÁSSICAS CONTINUAM AQUI --- */
+                <>
+                  <div>
+                    <label>Membro:</label>
+                    <select value={regraMembro1} onChange={e => { setRegraMembro1(e.target.value); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
+                      <option value="">Selecione...</option>
+                      {equipa.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label>{regraTipo === 'dia_especifico' ? 'Dia Alvo:' : 'Membro Alvo:'}</label>
+                    <select value={regraAlvo} onChange={e => { setRegraAlvo(e.target.value); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
+                      <option value="">Selecione...</option>
+                      {regraTipo === 'dia_especifico' 
+                        ? datasEscala.map((d, i) => <option key={i} value={formatDataKey(d)}>{formatDataDDMM(d)}</option>)
+                        : equipa.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)
+                      }
+                    </select>
+                  </div>
+                  {regraTipo === 'tocar_com_no_dia' && (
+                    <div>
+                      <label>No Dia:</label>
+                      <select value={regraAlvoData} onChange={e => { setRegraAlvoData(e.target.value); setRegraError(''); }} style={{ padding: '8px', borderRadius: '5px' }}>
+                        <option value="">Selecione o Dia...</option>
+                        {datasEscala.map((d, i) => <option key={i} value={formatDataKey(d)}>{formatDataDDMM(d)}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
+              
               <button onClick={adicionarRegra} style={{ padding: '8px 15px', backgroundColor: '#61dafb', color: '#282c34', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>+ Adicionar</button>
             </div>
             {regraError && <p style={{ color: '#ff4b4b', marginTop: '15px', fontWeight: 'bold' }}>⚠️ {regraError}</p>}
