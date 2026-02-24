@@ -34,7 +34,14 @@ export const gerarEscalas = (equipa, datasEscala, indisponibilidades, regras, va
 
       const dataAtual = datasEscala[diaIndex];
       const dataKey = formatDataKey(dataAtual);
-      const vagas = vagasPorDia[dataKey] || [];
+      
+      // FORÇA A ORDEM: Resolve as funções normais PRIMEIRO, e as de Crianças POR ÚLTIMO.
+      // Isso garante que a pessoa já esteja na função de Adulto quando a vaga de Criança for avaliada.
+      const vagas = (vagasPorDia[dataKey] || []).slice().sort((a, b) => {
+        if (a.label.includes('Crianças') && !b.label.includes('Crianças')) return 1;
+        if (!a.label.includes('Crianças') && b.label.includes('Crianças')) return -1;
+        return 0;
+      });
 
       const tentarPreencherDia = (vagaIndex, alocadosNesteDia) => {
         if (encontrouNestaTentativa) return;
@@ -48,14 +55,50 @@ export const gerarEscalas = (equipa, datasEscala, indisponibilidades, regras, va
 
         const vaga = vagas[vagaIndex];
         
-        // AGORA VERIFICA SE O MEMBRO TEM ALGUMA DAS FUNÇÕES QUE A VAGA ACEITA
-        let candidatos = equipa.filter(m => 
-          m.funcoes.some(f => vaga.aceita.includes(f)) &&
-          !indisponibilidades[`${m.id}_${dataKey}`] &&
-          !alocadosNesteDia.some(a => a.membro && a.membro.id === m.id)
-        );
+        const isCandidatoValido = (membro, vagaAtual, alocados) => {
+          if (indisponibilidades[`${membro.id}_${dataKey}`]) return false;
+
+          // 1. OBRIGATÓRIO: O membro tem que ter a função exata (ignorando maiúsculas/minúsculas para evitar bugs)
+          const temFuncaoExata = membro.funcoes.some(f => vagaAtual.aceita.some(a => a.toLowerCase() === f.toLowerCase()));
+          if (!temFuncaoExata) return false;
+
+          // 2. Pega as funções que o membro já pegou NESTE dia
+          const alocacoesDoMembro = alocados.filter(a => a.membro && a.membro.id === membro.id);
+          
+          if (alocacoesDoMembro.length >= 2) return false; // Ninguém faz 3 coisas
+
+          // 3. Se já tem 1 função hoje, a troca só é permitida se for pro par Criança + Adulto Musical
+          if (alocacoesDoMembro.length === 1) {
+            const vagaExistente = alocacoesDoMembro[0].vaga.label;
+            const labelAtual = vagaAtual.label;
+
+            const isMidiaOuSom = (label) => label.toLowerCase().includes('mídia') || label.toLowerCase().includes('som') || label.toLowerCase().includes('live');
+            const isCrianca = (label) => label.includes('Crianças');
+            const isAdultoMusical = (label) => !isCrianca(label) && !isMidiaOuSom(label);
+
+            const ehDobraValida = (isAdultoMusical(vagaExistente) && isCrianca(labelAtual)) || 
+                                  (isCrianca(vagaExistente) && isAdultoMusical(labelAtual));
+
+            if (!ehDobraValida) {
+              return false; // Bloqueia Mídia+Musical, Mídia+Crianças, ou Duas de Adulto
+            }
+          }
+
+          return true;
+        };
+
+        // AGORA VERIFICA AS FUNÇÕES E A PERMISSÃO DE DOBRA NAS CRIANÇAS
+        let candidatos = equipa.filter(m => isCandidatoValido(m, vaga, alocadosNesteDia));
 
         candidatos.sort((a, b) => {
+          // NOVA REGRA: Prioriza quem já está tocando no culto hoje (faz a dobra)
+          const aFazDobra = alocadosNesteDia.some(aloc => aloc.membro && aloc.membro.id === a.id);
+          const bFazDobra = alocadosNesteDia.some(aloc => aloc.membro && aloc.membro.id === b.id);
+          
+          if (aFazDobra && !bFazDobra) return -1; // A vai pro topo
+          if (!aFazDobra && bFazDobra) return 1;  // B vai pro topo
+
+          // Se empatar (ambos fazem dobra, ou nenhum faz), desempata por quem tocou menos no mês
           const usoA = contarParticipacoes(a.id, escalaAtual);
           const usoB = contarParticipacoes(b.id, escalaAtual);
           if (usoA === usoB) return Math.random() - 0.5;

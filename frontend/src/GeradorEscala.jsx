@@ -34,6 +34,17 @@ function GeradorEscala() {
 
   const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const diasSemanaNomes = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const getOrdemVaga = (label) => {
+    const lower = label.toLowerCase();
+    if (lower.includes('mídia') || lower.includes('som') || lower.includes('live')) return 10;
+    if (lower === 'voz e violão') return 20;
+    if (!lower.includes('voz') && !lower.includes('crianças')) return 30; // Bateria, Cajon, Baixo, etc
+    if (['voz 1', 'voz 2', 'voz 3'].includes(lower)) return 40;
+    if (lower.includes('voz') && !lower.includes('crianças')) return 50; // Voz 4, Voz 5...
+    if (lower === 'crianças - voz e violão') return 60;
+    if (lower.includes('crianças')) return 70;
+    return 100;
+  };
 
   useEffect(() => {
     Promise.all([
@@ -58,9 +69,29 @@ function GeradorEscala() {
           catalogo.push({
             id: `voz_hardcoded_${i}`,
             label: `Voz ${i}`,
-            aceita: ['Voz'] // Aceita quem tem a função "Voz" (ID 12)
+            aceita: ['Voz'] 
           });
         }
+
+        // 4. Injeta as vagas das crianças para que elas existam no sistema
+        catalogo.push({
+          id: 'criancas_voz_violao',
+          label: 'Crianças - Voz e violão',
+          aceita: ['Crianças - Voz e violão'] // <- Agora aceita APENAS esta função
+        });
+        catalogo.push({
+          id: 'criancas_voz',
+          label: 'Crianças - Voz 1', 
+          aceita: ['Crianças - Voz 1'] 
+        });
+
+        // NOVO: Ordena o catálogo inteiro para refletir na tabela e nos menus
+        catalogo.sort((a, b) => {
+          const ordemA = getOrdemVaga(a.label);
+          const ordemB = getOrdemVaga(b.label);
+          if (ordemA !== ordemB) return ordemA - ordemB;
+          return a.label.localeCompare(b.label);
+        });
 
         setCatalogoVagas(catalogo);
       }
@@ -84,25 +115,50 @@ function GeradorEscala() {
     
     const novasVagas = {};
     
-    // NOVOS PADRÕES DEFINIDOS POR VOCÊ
-    const padroes = ['Mídia', 'Voz e violão', 'Voz 1'];
-    const padroesCriancas = ['Crianças - Voz/Violão'];
+    // PADRÕES BÁSICOS PARA INICIALIZAR O MÊS (Incluindo Voz 2 e Voz 3)
+    const padroes = ['Mídia', 'Voz e violão', 'Voz 1', 'Voz 2', 'Voz 3'];
 
     diasEncontrados.forEach(d => {
       const key = formatDataKey(d);
-      let vagasIniciais = catalogoVagas.filter(v => padroes.includes(v.label));
-      
-      if (incluirCriancas) {
-        vagasIniciais = [...vagasIniciais, ...catalogoVagas.filter(v => padroesCriancas.includes(v.label))];
-      }
-      
-      novasVagas[key] = vagasIniciais;
+      novasVagas[key] = catalogoVagas.filter(v => padroes.includes(v.label));
     });
+    
     setVagasPorDia(novasVagas);
     setIndisponibilidades({});
     setRegras([]);
     setEscalasGeradas([]); 
-  }, [mes, ano, diaSemanaAlvo, catalogoVagas, incluirCriancas]);
+  }, [mes, ano, diaSemanaAlvo, catalogoVagas]); // O reset acontece apenas quando o mês/ano muda!
+
+  // --- EFEITO ÚNICO: ADICIONA/REMOVE AS CRIANÇAS SEM RESETAR A ESCALA ---
+  useEffect(() => {
+    if (catalogoVagas.length === 0 || Object.keys(vagasPorDia).length === 0) return;
+
+    const vagaCriancasBase = catalogoVagas.find(v => v.label === 'Crianças - Voz e violão');
+    const vagaCriancasVoz = catalogoVagas.find(v => v.label === 'Crianças - Voz 1');
+
+    setVagasPorDia(prev => {
+      const atualizado = { ...prev };
+      
+      Object.keys(atualizado).forEach(key => {
+        let vagasDia = [...atualizado[key]];
+        
+        if (incluirCriancas) {
+          if (vagaCriancasBase && !vagasDia.some(v => v.label === vagaCriancasBase.label)) {
+            vagasDia.push(vagaCriancasBase);
+          }
+          if (vagaCriancasVoz && !vagasDia.some(v => v.label === vagaCriancasVoz.label)) {
+            vagasDia.push(vagaCriancasVoz);
+          }
+        } else {
+          vagasDia = vagasDia.filter(v => v.label !== 'Crianças - Voz e violão' && v.label !== 'Crianças - Voz 1');
+        }
+        
+        atualizado[key] = vagasDia;
+      });
+      
+      return atualizado;
+    });
+  }, [incluirCriancas]);
 
   const adicionarVaga = (diaKey, vagaId) => {
     const vaga = catalogoVagas.find(v => v.id === vagaId);
@@ -172,11 +228,40 @@ function GeradorEscala() {
     const alocacaoAtual = alocadosNesteDia[alocacaoIndex];
     const membroAtualId = alocacaoAtual.membro.id || null;
 
-    // Atualizado para usar o 'aceita'
+    // Helper para trocas manuais mantendo as regras rigorosas
+    const isCandidatoValidoParaTroca = (membro, vagaAtual) => {
+      if (indisponibilidades[`${membro.id}_${diaKey}`]) return false;
+
+      // 1. OBRIGATÓRIO ter a função exata no perfil (ignorando case sensitive)
+      const temFuncaoExata = membro.funcoes.some(f => vagaAtual.aceita.some(a => a.toLowerCase() === f.toLowerCase()));
+      if (!temFuncaoExata) return false;
+
+      const outrasAlocacoes = alocadosNesteDia.filter(a => a.membro.id === membro.id && a.vaga.label !== vagaAtual.label);
+      if (outrasAlocacoes.length >= 2) return false;
+
+      // 2. Se já tem 1 função hoje, a troca só é permitida se for pro par Criança + Adulto Musical
+      if (outrasAlocacoes.length === 1) {
+        const vagaExistente = outrasAlocacoes[0].vaga.label;
+        const labelAtual = vagaAtual.label;
+
+        const isMidiaOuSom = (label) => label.toLowerCase().includes('mídia') || label.toLowerCase().includes('som') || label.toLowerCase().includes('live');
+        const isCrianca = (label) => label.includes('Crianças');
+        const isAdultoMusical = (label) => !isCrianca(label) && !isMidiaOuSom(label);
+
+        const ehDobraValida = (isAdultoMusical(vagaExistente) && isCrianca(labelAtual)) || 
+                              (isCrianca(vagaExistente) && isAdultoMusical(labelAtual));
+
+        if (!ehDobraValida) {
+          return false; // Bloqueia Mídia+Musical na troca manual
+        }
+      }
+
+      return true;
+    };
+
+    // Filtro atualizado para permitir a dobra de funções
     const candidatos = equipa.filter(m => 
-      m.funcoes.some(f => alocacaoAtual.vaga.aceita.includes(f)) &&
-      !indisponibilidades[`${m.id}_${diaKey}`] &&
-      (!alocadosNesteDia.some(a => a.membro.id === m.id) || m.id === membroAtualId)
+      isCandidatoValidoParaTroca(m, alocacaoAtual.vaga) || m.id === membroAtualId
     );
 
     candidatos.push({ id: null, nome: '---' });
@@ -423,7 +508,7 @@ function GeradorEscala() {
               </div>
 
               {/* MATRIZ PARA IMPRESSÃO */}
-              <div id="escala-resultado-matriz" style={{ padding: '20px', backgroundColor: '#282c34', borderRadius: '8px' }}>
+              <div id="escala-resultado-matriz" style={{ padding: '20px', backgroundColor: '#282c34', borderRadius: '8px', overflowX: 'auto', maxWidth: '100%' }}>
                 <h3 style={{ textAlign: 'center', color: 'white', marginTop: 0 }}>Escala de Louvor - {mesesNomes[mes]} / {ano}</h3>
                 <table className="escala-matrix" style={{ backgroundColor: '#282c34', width: '100%' }}>
                   <thead>
@@ -433,45 +518,89 @@ function GeradorEscala() {
                     </tr>
                   </thead>
                   <tbody>
-                    {catalogoVagas.map(vagaCatalogo => {
-                      const precisouNoMes = datasEscala.some(d => vagasPorDia[formatDataKey(d)]?.some(v => v.id === vagaCatalogo.id));
-                      if (!precisouNoMes) return null;
+                    {(() => {
+                      // Filtra apenas as vagas que realmente estão em uso neste mês
+                      const vagasAtivasNoMes = catalogoVagas.filter(vagaCatalogo => 
+                        datasEscala.some(d => vagasPorDia[formatDataKey(d)]?.some(v => v.id === vagaCatalogo.id))
+                      );
 
-                      return (
-                        <tr key={vagaCatalogo.id}>
-                          <td style={{ backgroundColor: '#3c414d', fontWeight: 'bold', color: '#61dafb' }}>
-                            {vagaCatalogo.label}
-                          </td>
-                          {datasEscala.map((d, colIndex) => {
-                            const diaKey = formatDataKey(d);
-                            const alocacaoDia = escalasGeradas[escalaAtualIndex][diaKey];
-                            const alocacao = alocacaoDia ? alocacaoDia.find(a => a.vaga.label === vagaCatalogo.label) : null;
-                            
-                            if (!alocacao) return <td key={colIndex} style={{ backgroundColor: '#2c3038', color: '#666', textAlign: 'center' }}>-</td>;
-                            
-                            const pessoa = alocacao.membro.nome;
-                            
-                            return (
-                              <td key={colIndex} style={{ textAlign: 'center', color: pessoa === '---' ? '#ff4b4b' : 'white', fontWeight: pessoa !== '---' ? 'bold' : 'normal' }}>
-                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                                  <span>{pessoa}</span>
-                                  <button 
-                                    onClick={() => handleTrocarMembro(diaKey, vagaCatalogo.label)} 
-                                    title="Substituir pessoa"
-                                    data-html2canvas-ignore="true" 
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6, fontSize: '1.1em', padding: 0 }}
-                                  >
-                                    🔄
-                                  </button>
-                                </div>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      )
-                    })}
+                      return vagasAtivasNoMes.map((vagaCatalogo, index, arr) => {
+                        // Verifica se é a primeira linha de criança para desenhar a borda separadora
+                        const isPrimeiraCrianca = vagaCatalogo.label.includes('Crianças') && 
+                                                  (index === 0 || !arr[index - 1].label.includes('Crianças'));
+                        
+                        const cellBorderStyle = isPrimeiraCrianca ? { borderTop: '3px solid #61dafb' } : {};
+
+                        return (
+                          <tr key={vagaCatalogo.id}>
+                            <td style={{ backgroundColor: '#3c414d', fontWeight: 'bold', color: '#61dafb', ...cellBorderStyle }}>
+                              {vagaCatalogo.label}
+                            </td>
+                            {datasEscala.map((d, colIndex) => {
+                              const diaKey = formatDataKey(d);
+                              const alocacaoDia = escalasGeradas[escalaAtualIndex][diaKey];
+                              const alocacao = alocacaoDia ? alocacaoDia.find(a => a.vaga.label === vagaCatalogo.label) : null;
+                              
+                              if (!alocacao) return <td key={colIndex} style={{ backgroundColor: '#2c3038', color: '#666', textAlign: 'center', ...cellBorderStyle }}>-</td>;
+                              
+                              const pessoa = alocacao.membro.nome;
+                              
+                              return (
+                                <td key={colIndex} style={{ textAlign: 'center', color: pessoa === '---' ? '#ff4b4b' : 'white', fontWeight: pessoa !== '---' ? 'bold' : 'normal', ...cellBorderStyle }}>
+                                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                                    <span>{pessoa}</span>
+                                    <button 
+                                      onClick={() => handleTrocarMembro(diaKey, vagaCatalogo.label)} 
+                                      title="Substituir pessoa"
+                                      data-html2canvas-ignore="true" 
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6, fontSize: '1.1em', padding: 0 }}
+                                    >
+                                      🔄
+                                    </button>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        )
+                      });
+                    })()}
                   </tbody>
                 </table>
+              </div>
+
+              {/* CONTADOR DE ESTATÍSTICAS (Ignorado pelo html2canvas) */}
+              <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#1e2229', borderRadius: '8px', border: '1px solid #4a505c' }}>
+                <h3 style={{ textAlign: 'center', color: '#61dafb', margin: '0 0 15px 0' }}>📊 Participações neste Mês</h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
+                  {(() => {
+                    const contagem = {};
+                    const escalaExibida = escalasGeradas[escalaAtualIndex];
+                    
+                    Object.values(escalaExibida).forEach(dia => {
+                      dia.forEach(aloc => {
+                        if (!aloc.membro || aloc.membro.nome === '---') return;
+                        const nome = aloc.membro.nome;
+                        if (!contagem[nome]) contagem[nome] = { cultos: 0, criancas: 0 };
+                        
+                        if (aloc.vaga.label.includes('Crianças')) contagem[nome].criancas += 1;
+                        else contagem[nome].cultos += 1;
+                      });
+                    });
+
+                    return Object.entries(contagem)
+                      .sort((a, b) => a[0].localeCompare(b[0])) // Ordena alfabeticamente
+                      .map(([nome, stats]) => (
+                        <div key={nome} style={{ backgroundColor: '#282c34', padding: '10px 15px', borderRadius: '5px', borderLeft: '3px solid #2ecc71', minWidth: '150px' }}>
+                          <strong style={{ display: 'block', color: 'white', marginBottom: '5px' }}>{nome}</strong>
+                          <div style={{ fontSize: '0.85em', color: '#9ab' }}>
+                            <span>⛪ Cultos: <strong style={{color: 'white'}}>{stats.cultos}</strong></span><br/>
+                            <span>🧸 Crianças: <strong style={{color: 'white'}}>{stats.criancas}</strong></span>
+                          </div>
+                        </div>
+                      ));
+                  })()}
+                </div>
               </div>
 
               {/* BOTÕES DE IMPRIMIR E WHATSAPP */}
