@@ -13,7 +13,7 @@ import './App.css';
 import GestaoMembros from './GestaoMembros'; // <-- Adicione esta linha junto com as outras importações
 
 // URL da sua API no Render
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://transpor-acordes-react-api.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://levihub-api.onrender.com';
 
 function App() {
   const [activeTab, setActiveTab] = useState('sequence');

@@ -16,8 +16,8 @@ import gspread
 import json
 
 # --- Configuração do Banco de Dados Turso ---
-TURSO_URL = os.getenv("TURSO_DATABASE_URL", "https://levi-roboto-db-rfpanfil.aws-us-east-2.turso.io")
-TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzE4NjIxODIsImlkIjoiMzZkMGNlYmItZDIwMS00NWU1LWI0ZTgtMDk5MmJhNWUzZTVlIiwicmlkIjoiMzZjYTljZjQtNmE0Ny00MDc4LTk5NWItYzY5YWJiY2FmMjA3In0.ctX09Go_KYD8wUFulZpRm8JSLHHRL1Ou44yualixomTUvSAx2x164BASeB-WfJRatV6JXcKRIF1U4wzCQwF9Cg")
+TURSO_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 def get_db_client():
     return libsql_client.create_client(url=TURSO_URL, auth_token=TURSO_TOKEN)
