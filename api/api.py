@@ -21,6 +21,12 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from fastapi import BackgroundTasks # NOVO: Para enviar o email sem travar a tela
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import string
 
 # Isso faz o Python ler o arquivo .env invisível no seu computador
 load_dotenv()
@@ -138,6 +144,13 @@ async def lifespan(app: FastAPI):
     try: await client.execute("ALTER TABLE usuarios ADD COLUMN funcoes_padrao TEXT DEFAULT 'Mídia,Voz e violão,Voz 1,Voz 2,Voz 3'")
     except: pass
     
+    # --- NOVAS COLUNAS DE SEGURANÇA ---
+    # DEFAULT 1 salva a sua conta antiga. Novas contas serão forçadas a 0 no ato do cadastro.
+    try: await client.execute("ALTER TABLE usuarios ADD COLUMN is_verified BOOLEAN DEFAULT 1")
+    except: pass
+    try: await client.execute("ALTER TABLE usuarios ADD COLUMN verification_code TEXT")
+    except: pass
+    
     tabelas = ["membros", "funcoes", "biblioteca_busca", "agitadas1", "agitadas2", "lentas1", "lentas2", "ceia", "infantis"]
     for tabela in tabelas:
         try: await client.execute(f"ALTER TABLE {tabela} ADD COLUMN usuario_id INTEGER")
@@ -165,49 +178,113 @@ app.add_middleware(
 )
 
 # ==========================================================
-# ROTAS DE AUTENTICAÇÃO E USUÁRIOS
+# ROTAS DE AUTENTICAÇÃO, EMAILS E USUÁRIOS
 # ==========================================================
 
+def enviar_email_verificacao(destinatario: str, codigo: str):
+    remetente = os.getenv("SMTP_EMAIL")
+    senha = os.getenv("SMTP_PASSWORD")
+    if not remetente or not senha:
+        print(f"AVISO: Email não configurado no .env. O código para {destinatario} é: {codigo}")
+        return
+
+    msg = MIMEMultipart()
+    msg['From'] = remetente
+    msg['To'] = destinatario
+    msg['Subject'] = "Verifique a sua conta no LeviHub 🎸"
+
+    body = f"""Olá Abençoado(a)!
+    
+Bem-vindo ao LeviHub! O seu código de verificação é:
+
+{codigo}
+
+Insira este código na tela de cadastro para ativar a sua conta.
+
+Deus abençoe!"""
+    
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        # Burlar verificação SSL local para não travar no computador de desenvolvimento
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(remetente, senha)
+            server.sendmail(remetente, destinatario, msg.as_string())
+            print(f"E-mail de verificação enviado para {destinatario}")
+    except Exception as e:
+        print(f"Erro ao enviar email: {e}")
+
 @app.post("/auth/register")
-async def register_user(user: UserCreate):
+async def register_user(user: UserCreate, background_tasks: BackgroundTasks):
     client = get_db_client()
     try:
-        # Verifica se email já existe
         check = await client.execute("SELECT id FROM usuarios WHERE email = ?", [user.email])
-        if check.rows:
-            raise HTTPException(status_code=400, detail="Email já cadastrado.")
+        if check.rows: raise HTTPException(status_code=400, detail="Email já cadastrado.")
         
         hashed_pwd = get_password_hash(user.password)
+        # Gera código de 6 dígitos aleatório
+        codigo_verificacao = ''.join(random.choices(string.digits, k=6))
+        
         res = await client.execute(
-            "INSERT INTO usuarios (email, senha, usar_banco_padrao) VALUES (?, ?, 1)",
-            [user.email, hashed_pwd]
+            "INSERT INTO usuarios (email, senha, usar_banco_padrao, is_verified, verification_code) VALUES (?, ?, 1, 0, ?)",
+            [user.email, hashed_pwd, codigo_verificacao]
         )
-        return {"message": "Usuário criado com sucesso", "id": res.last_insert_rowid}
-    finally:
-        await client.close()
+        
+        # Envia o email em "segundo plano" para a tela do usuário não ficar travada carregando
+        background_tasks.add_task(enviar_email_verificacao, user.email, codigo_verificacao)
+        
+        return {"message": "Usuário criado. Verifique o seu e-mail.", "email": user.email}
+    finally: await client.close()
+
+class VerifyRequest(BaseModel):
+    email: str
+    codigo: str
+
+@app.post("/auth/verify")
+async def verify_email(req: VerifyRequest):
+    client = get_db_client()
+    try:
+        res = await client.execute("SELECT id, verification_code FROM usuarios WHERE email = ?", [req.email])
+        if not res.rows: raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        
+        user_id = res.rows[0][0]
+        code_db = res.rows[0][1]
+        
+        if code_db != req.codigo.strip():
+            raise HTTPException(status_code=400, detail="Código inválido ou expirado.")
+            
+        await client.execute("UPDATE usuarios SET is_verified = 1, verification_code = NULL WHERE id = ?", [user_id])
+        return {"message": "Email verificado com sucesso! Já pode fazer o login."}
+    finally: await client.close()
 
 @app.post("/auth/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     client = get_db_client()
     try:
-        result = await client.execute("SELECT id, senha FROM usuarios WHERE email = ?", [form_data.username])
-        if not result.rows:
-            raise HTTPException(status_code=401, detail="Email ou senha incorretos", headers={"WWW-Authenticate": "Bearer"})
+        result = await client.execute("SELECT id, senha, is_verified FROM usuarios WHERE email = ?", [form_data.username])
+        if not result.rows: raise HTTPException(status_code=401, detail="Email ou senha incorretos")
         
         user_db = result.rows[0]
         user_id = user_db[0]
         hashed_pwd = user_db[1]
+        is_verified = user_db[2]
         
         if not verify_password(form_data.password, hashed_pwd):
-            raise HTTPException(status_code=401, detail="Email ou senha incorretos", headers={"WWW-Authenticate": "Bearer"})
+            raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+            
+        if not is_verified:
+            raise HTTPException(status_code=403, detail="E-mail não verificado. Procure o código na sua caixa de entrada.")
         
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": str(user_id)}, expires_delta=access_token_expires
-        )
+        access_token = create_access_token(data={"sub": str(user_id)}, expires_delta=access_token_expires)
         return {"access_token": access_token, "token_type": "bearer"}
-    finally:
-        await client.close()
+    finally: await client.close()
+
+
 
 # ==========================================================
 # ROTAS NOVAS: ESCALA DE LOUVOR E GESTÃO DE MEMBROS (MULTI-TENANT)
