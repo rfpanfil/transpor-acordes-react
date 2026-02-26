@@ -85,8 +85,10 @@ function LeviRoboto() {
             target="_blank" 
             rel="noopener noreferrer"
             className="clickable-link"
+            title={parte}
+            style={{ marginLeft: '5px', fontSize: '0.9em' }}
           >
-            {parte}
+            🔗 Ouvir / Cifra
           </a>
         );
       }
@@ -100,7 +102,10 @@ function LeviRoboto() {
     setUltimaPalavra(termoDeBusca); 
     
     try {
-      const res = await fetch(`${API_BASE_URL}/musicas/buscar?q=${encodeURIComponent(termoDeBusca)}`);
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      
+      const res = await fetch(`${API_BASE_URL}/musicas/buscar?q=${encodeURIComponent(termoDeBusca)}`, { headers });
       const data = await res.json();
       
       if (data.error) {
@@ -149,6 +154,7 @@ function LeviRoboto() {
     const command = text.trim().toLowerCase();
 
     try {
+      // --- PASSO 1: COMANDOS GLOBAIS (Funcionam em qualquer estado) ---
       if (command === '/cancel') {
         setBotState('idle');
         addMessage('bot', 'Conversa cancelada.\nSe precisar é só dar um /start');
@@ -164,89 +170,92 @@ function LeviRoboto() {
       else if (command === '/opcao5') {
         if (ultimaPalavra) {
           addMessage('bot', `Refazendo a busca para: ${ultimaPalavra}...`);
-          // Chama a funÃ§Ã£o de busca isolada
           await executarBusca(ultimaPalavra); 
         } else {
-          addMessage('bot', 'Não há uma palavra-chave armazenada. Por favor, faça uma nova busca por palavra-chave usando a /opcao1.');
+          addMessage('bot', 'Não há uma palavra-chave armazenada. Use a /opcao1.');
         }
       }
-      else if (botState === 'idle') {
-        if (command === '/opcao1') {
-          setBotState('esperando_busca');
-          addMessage('bot', 'Digite uma palavra-chave para buscar músicas correspondentes:');
-        } else if (command === '/opcao2') {
-          const res = await fetch(`${API_BASE_URL}/musicas/sortear`);
-          const data = await res.json();
-          if (data.error) {
-             addMessage('bot', `Erro: ${data.error}`);
-          } else {
-             let msgSorteio = "Músicas para o louvor do dia:\n\n";
-             msgSorteio += `1) ${data.agitadas1}\n\n`;
-             msgSorteio += `2) ${data.agitadas2}\n\n`;
-             msgSorteio += `3) ${data.lentas1}\n\n`;
-             msgSorteio += `4) ${data.lentas2}\n\n`;
-             msgSorteio += `Música para ceia: ${data.ceia}\n\n`;
-             msgSorteio += `Música para as crianças: ${data.infantis}\n\n`;
-             
-             addMessage('bot', msgSorteio);
-             
-             setTimeout(() => {
-                addMessage('bot', 'O que gostaria de fazer agora? 🤔\n/opcao1: Fazer uma busca por palavra chave\n/opcao2: Listar novamente algumas músicas para planejar o louvor do dia\n/opcao3: Sugerir uma música para o nosso banco de dados\n/opcao4: Encerrar');
-             }, 600);
-          }
-        } else if (command === '/opcao3') {
-          setBotState('esperando_sugestao');
-          addMessage('bot', 'Por favor, sugira uma música que gostaria de adicionar à lista.');
-        } else {
-          if (command.startsWith('/')) {
-             addMessage('bot', 'Comando não reconhecido. Use o /start para ver as opções válidas.');
-          } else {
-             // É uma busca rápida direto no estado IDLE. Chama a busca e finaliza.
-             await executarBusca(text);
-          }
-        }
+      else if (command === '/opcao1') {
+        setBotState('esperando_busca');
+        addMessage('bot', 'Digite uma palavra-chave para buscar músicas correspondentes:');
       } 
-      else if (botState === 'esperando_busca') {
-        if (command.startsWith('/') && command !== '/cancel') {
-            setBotState('idle');
-            // Joga pra fila de execução para evitar conflito de estado
-            setTimeout(() => handleSend(command), 0);
-            setIsLoading(false);
-            return;
-        }
+      else if (command === '/opcao2') {
+        setBotState('idle');
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         
-        await executarBusca(text);
-      }
-      else if (botState === 'esperando_sugestao') {
-        if (command.startsWith('/') && command !== '/cancel') {
-            setBotState('idle');
-            setTimeout(() => handleSend(command), 0);
-            setIsLoading(false);
-            return;
-        }
-        
-        // Envia para a API que salva no Google Sheets
-        const res = await fetch(`${API_BASE_URL}/musicas/sugerir`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario: 'Usuário Web', sugestao: text })
-        });
+        const res = await fetch(`${API_BASE_URL}/musicas/sortear`, { headers });
         const data = await res.json();
         
         if (data.error) {
-            addMessage('bot', 'Tive um probleminha para salvar na planilha, mas anotei aqui no sistema! Obrigado.');
+           addMessage('bot', `Erro: ${data.error}`);
         } else {
-            addMessage('bot', 'Sugestão enviada com sucesso! Obrigado por contribuir com a nossa lista de músicas.');
+           let msgSorteio = "🎸 Músicas sorteadas para o louvor:\n\n";
+           
+           if (data.is_custom) {
+               // --- LÓGICA DO REPERTÓRIO PESSOAL (CATEGORIAS DINÂMICAS) ---
+               if (Object.keys(data.sorteio).length === 0) {
+                   msgSorteio = "Seu repertório está vazio! Adicione músicas na aba 'Meu Repertório' para eu poder sortear.";
+               } else {
+                   Object.entries(data.sorteio).forEach(([categoria, musica]) => {
+                       msgSorteio += `*${categoria.toUpperCase()}*:\n${musica}\n\n`;
+                   });
+               }
+           } else {
+               // --- LÓGICA DO REPERTÓRIO GLOBAL (FIXO) ---
+               msgSorteio += `1) ${data.agitadas1}\n\n2) ${data.agitadas2}\n\n3) ${data.lentas1}\n\n4) ${data.lentas2}\n\n`;
+               msgSorteio += `Música para ceia: ${data.ceia}\n\n`;
+               msgSorteio += `Música para as crianças: ${data.infantis}\n\n`;
+           }
+           
+           addMessage('bot', msgSorteio);
+           
+           setTimeout(() => {
+              addMessage('bot', 'O que gostaria de fazer agora? 🤔\n/opcao1: Fazer uma busca por palavra chave\n/opcao2: Listar novamente as músicas\n/opcao3: Sugerir uma música\n/opcao4: Encerrar');
+           }, 600);
         }
-        
-        setTimeout(() => {
-            addMessage('bot', 'O que gostaria de fazer agora? 🤔\n/opcao1: Fazer uma busca por palavra chave\n/opcao2: Listar algumas músicas para planejar o louvor do dia\n/opcao3: Sugerir uma nova música para o nosso banco de dados\n/opcao4: Encerrar');
-        }, 600);
-        
-        setBotState('idle');
+      }
+      else if (command === '/opcao3') {
+        setBotState('esperando_sugestao');
+        addMessage('bot', 'Por favor, sugira uma música que gostaria de adicionar à lista.');
+      }
+
+      // --- PASSO 2: PROCESSAMENTO DE TEXTO (Apenas se não for um comando acima) ---
+      else {
+        if (botState === 'esperando_busca') {
+          await executarBusca(text);
+        }
+        else if (botState === 'esperando_sugestao') {
+          const res = await fetch(`${API_BASE_URL}/musicas/sugerir`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ usuario: 'Usuário Web', sugestao: text })
+          });
+          const data = await res.json();
+          
+          if (data.error) {
+              addMessage('bot', 'Tive um probleminha para salvar na planilha, mas anotei aqui! Obrigado.');
+          } else {
+              addMessage('bot', 'Sugestão enviada com sucesso! Obrigado por contribuir.');
+          }
+          
+          setTimeout(() => {
+              addMessage('bot', 'O que gostaria de fazer agora? 🤔\n/opcao1: Buscar por palavra chave\n/opcao2: Listar músicas\n/opcao3: Sugerir nova música\n/opcao4: Encerrar');
+          }, 600);
+          
+          setBotState('idle');
+        }
+        else {
+          // Se o usuário digitar algo aleatório sem estar em um estado de espera
+          if (command.startsWith('/')) {
+            addMessage('bot', 'Comando não reconhecido. Use o /start.');
+          } else {
+            await executarBusca(text);
+          }
+        }
       }
     } catch (e) {
-      addMessage('bot', 'Desculpe, ocorreu um erro de conexão com o servidor da API.');
+      addMessage('bot', 'Desculpe, ocorreu um erro de conexão com o servidor.');
       setBotState('idle');
     }
 

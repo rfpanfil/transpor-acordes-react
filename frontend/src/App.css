@@ -805,3 +805,135 @@ pre {
 .bubble-user .clickable-link {
   color: #1e2229; /* Escuro no balão do usuário */
 }
+
+
+/* --- ESTILOS DA TELA DE LOGIN (FASE 2) --- */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #282c34;
+}
+
+.login-card {
+  background-color: #3c414d;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.login-card h1 {
+  margin-bottom: 10px;
+}
+
+.login-card p {
+  color: #9ab;
+  margin-bottom: 30px;
+}
+
+.input-group {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #61dafb;
+}
+
+.login-btn-main {
+  width: 100%;
+  padding: 12px;
+  background-color: #61dafb;
+  color: #282c34;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 1.1em;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.login-divider {
+  margin: 20px 0;
+  color: #4a505c;
+  font-size: 0.9em;
+  position: relative;
+}
+
+.login-btn-visitor {
+  width: 100%;
+  padding: 10px;
+  background-color: transparent;
+  color: #ccc;
+  border: 1px solid #4a505c;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.login-btn-visitor:hover {
+  border-color: #61dafb;
+  color: #61dafb;
+}
+
+.login-error {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  font-size: 0.9em;
+}
+
+.login-footer {
+  margin-top: 25px;
+  font-size: 0.9em;
+  color: #9ab;
+}
+
+.login-footer span {
+  color: #61dafb;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* --- MELHORIA DOS CAMPOS DE ENTRADA DO LOGIN --- */
+.input-group input {
+  width: 100%;
+  padding: 12px 15px;
+  background-color: #2c3038;
+  border: 1px solid #4a505c;
+  border-radius: 8px;
+  color: white;
+  font-size: 1.05em;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #61dafb;
+  box-shadow: 0 0 0 3px rgba(97, 218, 251, 0.2);
+}
+
+.input-group input::placeholder {
+  color: #7a8494;
+}
+
+.visitor-banner {
+  background-color: #ffd7001a;
+  color: #ffd700;
+  padding: 10px;
+  text-align: center;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #ffd700;
+  font-weight: bold;
+}
+

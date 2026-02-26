@@ -6,3 +6,6 @@ python-docx
 libsql-client
 gspread
 oauth2client
+passlib[bcrypt]
+python-jose[cryptography]
+pip install python-dotenv

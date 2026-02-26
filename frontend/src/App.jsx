@@ -7,10 +7,14 @@ import ToggleSwitch from './ToggleSwitch';
 import DragDropOverlay from './DragDropOverlay';
 import GeradorEscala from './GeradorEscala';
 import LeviRoboto from './LeviRoboto';
+import Login from './Login';
+import GestaoMembros from './GestaoMembros';
+import GerenciarPerfil from './GerenciarPerfil';
+import GerenciarRepertorio from './GerenciarRepertorio';
 // Importamos a lógica local para usar APENAS se a API falhar
 import { calcularSequenciaLocal, processarCifraCompleta } from './musicLogic';
 import './App.css';
-import GestaoMembros from './GestaoMembros'; // <-- Adicione esta linha junto com as outras importações
+
 
 // URL da sua API no Render
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://levihub-api.onrender.com';
@@ -40,6 +44,35 @@ function App() {
   const fileStatusRef = useRef(null);
 
   const [appMode, setAppMode] = useState('transpositor');
+
+  // --- NOVOS ESTADOS DA FASE 2 ---
+  const [user, setUser] = useState(null);
+  const [isVisitor, setIsVisitor] = useState(false);
+
+  // Verifica se já existe um token salvo ao abrir o site
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token');
+    if (savedToken) {
+      // Por enquanto, apenas assume que o utilizador está logado. 
+      // Na Fase 3, validaremos este token com o backend.
+      setUser({ token: savedToken });
+    }
+  }, []);
+
+  const handleLoginAction = (userData) => {
+    if (userData === null) {
+      setIsVisitor(true);
+    } else {
+      setUser(userData);
+      setIsVisitor(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setIsVisitor(false);
+  };
 
   useEffect(() => {
     if (selectedFile && fileStatusRef.current) {
@@ -250,15 +283,33 @@ function App() {
     { label: 'Diminuir', value: 'Diminuir' }
   ];
 
+  // --- LÓGICA DE BLOQUEIO (COLE AQUI) ---
+  if (!user && !isVisitor) {
+    return <Login onLogin={handleLoginAction} />;
+  }
+
   return (
     <div className="App" onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
       {isDragging && <DragDropOverlay />}
 
-      {/* Título unificado do App */}
+      {/* Botão de Sair no topo */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button onClick={handleLogout} className="nav-btn" style={{ padding: '5px 15px', fontSize: '0.8em', borderColor: '#ff4b4b', color: '#ff4b4b' }}>
+          Sair / Trocar Conta
+        </button>
+      </div>
+
       <h1>Sistema de Louvor</h1>
+      
+      {/* Banner de aviso para visitantes */}
+      {isVisitor && (
+        <div className="visitor-banner">
+          ⚠️ Você está no modo <b>Visitante</b>. Faça login para acessar as escalas da sua igreja.
+        </div>
+      )}
 
       {/* --- MENU PRINCIPAL ATUALIZADO --- */}
-      <div className="main-nav">
+      <div className="main-nav" style={{ flexWrap: 'wrap' }}>
         <button
           className={appMode === 'transpositor' ? 'nav-btn active' : 'nav-btn'}
           onClick={() => setAppMode('transpositor')}
@@ -283,6 +334,26 @@ function App() {
         >
           🤖 Levi Roboto
         </button>
+        
+        {/* NOVOS BOTÕES (Só aparecem se NÃO for visitante) */}
+        {!isVisitor && (
+          <>
+            <button
+              className={appMode === 'meu_repertorio' ? 'nav-btn active' : 'nav-btn'}
+              onClick={() => setAppMode('meu_repertorio')}
+              style={{ borderColor: '#f39c12', color: appMode === 'meu_repertorio' ? '#1e2229' : '#f39c12', backgroundColor: appMode === 'meu_repertorio' ? '#f39c12' : 'transparent' }}
+            >
+              🎸 Meu Repertório
+            </button>
+            <button
+              className={appMode === 'perfil' ? 'nav-btn active' : 'nav-btn'}
+              onClick={() => setAppMode('perfil')}
+              style={{ borderColor: '#2ecc71', color: appMode === 'perfil' ? '#1e2229' : '#2ecc71', backgroundColor: appMode === 'perfil' ? '#2ecc71' : 'transparent' }}
+            >
+              👤 Perfil
+            </button>
+          </>
+        )}
       </div>
 
       {/* --- LÓGICA DE ALTERNÂNCIA DE TELAS --- */}
@@ -442,6 +513,15 @@ function App() {
 
       {appMode === 'repertorio' && (
         <LeviRoboto />
+      )}
+
+      {/* AS NOVAS TELAS ENTRAM AQUI */}
+      {appMode === 'meu_repertorio' && (
+        <GerenciarRepertorio />
+      )}
+
+      {appMode === 'perfil' && (
+        <GerenciarPerfil />
       )}
 
       {error && <p style={{ color: '#ff4b4b', textAlign: 'center', marginTop: '15px' }}>{error}</p>}

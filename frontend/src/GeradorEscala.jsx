@@ -8,6 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 function GeradorEscala() {
   const [equipa, setEquipa] = useState([]);
   const [catalogoVagas, setCatalogoVagas] = useState([]);
+  const [funcoesPadraoUsuario, setFuncoesPadraoUsuario] = useState([]); // NOVO ESTADO
   const [isLoading, setIsLoading] = useState(true);
 
   const dataAtual = new Date();
@@ -16,32 +17,30 @@ function GeradorEscala() {
   const [diaSemanaAlvo, setDiaSemanaAlvo] = useState(0); 
   const [datasEscala, setDatasEscala] = useState([]);
 
-  const [incluirCriancas, setIncluirCriancas] = useState(false);
+  // Retiramos o estado 'incluirCriancas' pois agora o usuário define tudo no Perfil
   const [vagasPorDia, setVagasPorDia] = useState({});
   const [indisponibilidades, setIndisponibilidades] = useState({});
   const [regras, setRegras] = useState([]);
   
   const [regraMembro1, setRegraMembro1] = useState('');
-  const [regraTipo, setRegraTipo] = useState('frequencia'); // Definimos Frequência como padrão
+  const [regraTipo, setRegraTipo] = useState('frequencia'); 
   const [regraAlvo, setRegraAlvo] = useState('');
   const [regraAlvoData, setRegraAlvoData] = useState('');
   const [regraFuncao, setRegraFuncao] = useState('');
   const [regraQuantidade, setRegraQuantidade] = useState(1);
   const [regraError, setRegraError] = useState('');
 
-  // Lógica Dinâmica: Calcula quantos "Tickets" a pessoa tem. 
-  // Agora separa "Culto" (Adulto) e "Crianças" em contagens paralelas, pois permitem dobra no mesmo dia.
   const getDiasDisponiveisMembro = (membroId, funcaoAlvo) => {
     if (!membroId) return 0;
     const totalDias = datasEscala.length;
     const faltas = datasEscala.filter(d => indisponibilidades[`${membroId}_${formatDataKey(d)}`]).length;
     
-    const isCrianca = (label) => label && label.includes('Crianças');
-    const alvoEhCrianca = isCrianca(funcaoAlvo);
+    // Simplificamos a lógica de "crianças" para aceitar qualquer nome que o usuário dê
+    const alvoIsDobra = funcaoAlvo && funcaoAlvo.toLowerCase().includes('criança');
 
     const vagasComprometidas = regras
       .filter(r => r.tipo === 'frequencia' && r.membro1 === membroId.toString())
-      .filter(r => isCrianca(r.funcao) === alvoEhCrianca) // Conta apenas as vagas da mesma categoria
+      .filter(r => (r.funcao.toLowerCase().includes('criança')) === alvoIsDobra)
       .reduce((sum, r) => sum + parseInt(r.quantidade), 0);
     
     return totalDias - faltas - vagasComprometidas;
@@ -54,65 +53,33 @@ function GeradorEscala() {
 
   const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const diasSemanaNomes = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-  const getOrdemVaga = (label) => {
-    const lower = label.toLowerCase();
-    if (lower.includes('mídia') || lower.includes('som') || lower.includes('live')) return 10;
-    if (lower === 'voz e violão') return 20;
-    if (!lower.includes('voz') && !lower.includes('crianças')) return 30; // Bateria, Cajon, Baixo, etc
-    if (['voz 1', 'voz 2', 'voz 3'].includes(lower)) return 40;
-    if (lower.includes('voz') && !lower.includes('crianças')) return 50; // Voz 4, Voz 5...
-    if (lower === 'crianças - voz e violão') return 60;
-    if (lower.includes('crianças')) return 70;
-    return 100;
-  };
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}` };
+
     Promise.all([
-      fetch(`${API_BASE_URL}/equipe`).then(res => res.json()),
-      fetch(`${API_BASE_URL}/funcoes`).then(res => res.json())
-    ]).then(([equipeData, funcoesData]) => {
+      fetch(`${API_BASE_URL}/equipe`, { headers }).then(res => res.json()),
+      fetch(`${API_BASE_URL}/funcoes`, { headers }).then(res => res.json()),
+      fetch(`${API_BASE_URL}/usuario/me`, { headers }).then(res => res.json()) // BUSCA O PERFIL AQUI
+    ]).then(([equipeData, funcoesData, perfilData]) => {
+      
       if (equipeData.equipe) setEquipa(equipeData.equipe);
+      
+      if (perfilData && !perfilData.error) {
+        // Extrai as funções que o usuário marcou como padrão no Perfil
+        const padroes = perfilData.funcoes_padrao ? perfilData.funcoes_padrao.split(',') : [];
+        setFuncoesPadraoUsuario(padroes);
+      }
+
       if (funcoesData.funcoes) {
-        
-        // 1. Cria o catálogo base a partir do banco (1:1)
         let catalogo = funcoesData.funcoes.map(f => ({
           id: f.id.toString(),
           label: f.nome,
           aceita: [f.nome] 
         }));
 
-        // 2. Remove a "Voz" genérica para não aparecer no Dropdown
-        catalogo = catalogo.filter(c => c.label !== 'Voz');
-
-        // 3. Injeta Voz 1 até Voz 5 mapeadas para a função "Voz" do banco
-        for (let i = 1; i <= 5; i++) {
-          catalogo.push({
-            id: `voz_hardcoded_${i}`,
-            label: `Voz ${i}`,
-            aceita: ['Voz'] 
-          });
-        }
-
-        // 4. Injeta as vagas das crianças para que elas existam no sistema
-        catalogo.push({
-          id: 'criancas_voz_violao',
-          label: 'Crianças - Voz e violão',
-          aceita: ['Crianças - Voz e violão'] // <- Agora aceita APENAS esta função
-        });
-        catalogo.push({
-          id: 'criancas_voz',
-          label: 'Crianças - Voz 1', 
-          aceita: ['Crianças - Voz 1'] 
-        });
-
-        // NOVO: Ordena o catálogo inteiro para refletir na tabela e nos menus
-        catalogo.sort((a, b) => {
-          const ordemA = getOrdemVaga(a.label);
-          const ordemB = getOrdemVaga(b.label);
-          if (ordemA !== ordemB) return ordemA - ordemB;
-          return a.label.localeCompare(b.label);
-        });
-
+        catalogo.sort((a, b) => a.label.localeCompare(b.label));
         setCatalogoVagas(catalogo);
       }
       setIsLoading(false);
@@ -123,7 +90,7 @@ function GeradorEscala() {
   const formatDataDDMM = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
   useEffect(() => {
-    if (catalogoVagas.length === 0) return;
+    if (catalogoVagas.length === 0 || funcoesPadraoUsuario.length === 0) return;
 
     const diasEncontrados = [];
     const dataIteracao = new Date(ano, mes, 1);
@@ -135,58 +102,21 @@ function GeradorEscala() {
     
     const novasVagas = {};
     
-    // PADRÕES BÁSICOS PARA INICIALIZAR O MÊS
-    const padroes = ['Mídia', 'Voz e violão', 'Voz 1', 'Voz 2', 'Voz 3'];
-    
-    // Se a opção de crianças estiver ativada, já inclui elas no padrão do novo mês
-    if (incluirCriancas) {
-      padroes.push('Crianças - Voz e violão', 'Crianças - Voz 1');
-    }
-
+    // AGORA ELE USA O PADRÃO QUE VEIO DO BANCO DE DADOS DO USUÁRIO
     diasEncontrados.forEach(d => {
       const key = formatDataKey(d);
-      novasVagas[key] = catalogoVagas.filter(v => padroes.includes(v.label));
+      novasVagas[key] = catalogoVagas.filter(v => funcoesPadraoUsuario.includes(v.label));
     });
     
     setVagasPorDia(novasVagas);
     setIndisponibilidades({});
     setRegras([]);
     setEscalasGeradas([]); 
-    // A caixinha não será mais desmarcada e a seleção permanecerá
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mes, ano, diaSemanaAlvo, catalogoVagas]); // O reset acontece apenas quando o mês/ano muda!
+  }, [mes, ano, diaSemanaAlvo, catalogoVagas, funcoesPadraoUsuario]);
 
-  // --- EFEITO ÚNICO: ADICIONA/REMOVE AS CRIANÇAS SEM RESETAR A ESCALA ---
-  useEffect(() => {
-    if (catalogoVagas.length === 0 || Object.keys(vagasPorDia).length === 0) return;
-
-    const vagaCriancasBase = catalogoVagas.find(v => v.label === 'Crianças - Voz e violão');
-    const vagaCriancasVoz = catalogoVagas.find(v => v.label === 'Crianças - Voz 1');
-
-    setVagasPorDia(prev => {
-      const atualizado = { ...prev };
-      
-      Object.keys(atualizado).forEach(key => {
-        let vagasDia = [...atualizado[key]];
-        
-        if (incluirCriancas) {
-          if (vagaCriancasBase && !vagasDia.some(v => v.label === vagaCriancasBase.label)) {
-            vagasDia.push(vagaCriancasBase);
-          }
-          if (vagaCriancasVoz && !vagasDia.some(v => v.label === vagaCriancasVoz.label)) {
-            vagasDia.push(vagaCriancasVoz);
-          }
-        } else {
-          vagasDia = vagasDia.filter(v => v.label !== 'Crianças - Voz e violão' && v.label !== 'Crianças - Voz 1');
-        }
-        
-        atualizado[key] = vagasDia;
-      });
-      
-      return atualizado;
-    });
-  }, [incluirCriancas]);
-
+  // (Remova a função useEffect inteira que lidava com o `incluirCriancas`, pois não precisamos mais dela!)
+  
   const adicionarVaga = (diaKey, vagaId) => {
     const vaga = catalogoVagas.find(v => v.id === vagaId);
     setVagasPorDia(prev => {
@@ -378,11 +308,10 @@ function GeradorEscala() {
                 {formatDataDDMM(data)}
                 </span>
             ))}
-            </div>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0, fontWeight: 'bold' }}>
-            <input type="checkbox" checked={incluirCriancas} onChange={(e) => setIncluirCriancas(e.target.checked)} style={{ width: '20px', height: '20px', marginRight: '10px' }}/>
-            Incluir Escala das Crianças
-          </label>
+          </div>
+          <span style={{ fontSize: '0.8em', color: '#9ab', fontStyle: 'italic' }}>
+            Para alterar as colunas/funções padrão, vá à aba 👤 Perfil.
+          </span>
         </div>
       </div>
 

@@ -20,6 +20,9 @@ function GestaoMembros() {
   const [status, setStatus] = useState('ativo');
   const [funcoesSelecionadas, setFuncoesSelecionadas] = useState([]);
   
+  // Estado para Criação Rápida de Função no Modal de Membro
+  const [novaFuncaoInline, setNovaFuncaoInline] = useState('');
+
   const [mensagem, setMensagem] = useState({ texto: '', tipo: '' });
 
   // Estados do Modal de Funções (CRUD)
@@ -30,11 +33,16 @@ function GestaoMembros() {
   const [editandoFuncaoNome, setEditandoFuncaoNome] = useState('');
 
   const carregarDados = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return; 
+
     setIsLoading(true);
     try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+      
       const [resEquipe, resFuncoes] = await Promise.all([
-        fetch(`${API_BASE_URL}/equipe?apenas_ativos=false`), 
-        fetch(`${API_BASE_URL}/funcoes`)
+        fetch(`${API_BASE_URL}/equipe?apenas_ativos=false`, { headers }), 
+        fetch(`${API_BASE_URL}/funcoes`, { headers })
       ]);
       
       const dataEquipe = await resEquipe.json();
@@ -47,8 +55,7 @@ function GestaoMembros() {
       }
       
     } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-      mostrarMensagem("Erro ao conectar com a API.", "erro");
+      mostrarMensagem("Erro ao carregar dados.", "erro");
     } finally {
       setIsLoading(false);
     }
@@ -60,12 +67,13 @@ function GestaoMembros() {
 
   const mostrarMensagem = (texto, tipo) => {
     setMensagem({ texto, tipo });
-    setTimeout(() => setMensagem({ texto: '', tipo: '' }), 3000);
+    setTimeout(() => setMensagem({ texto: '', tipo: '' }), 4000);
   };
 
   // --- LÓGICA DE MEMBROS ---
   const abrirModalNovo = () => {
-    setNome(''); setTelefone(''); setEmail(''); setStatus('ativo'); setFuncoesSelecionadas([]);
+    setNome(''); setTelefone(''); setEmail(''); setStatus('ativo'); 
+    setFuncoesSelecionadas([]); setNovaFuncaoInline('');
     setIsEditing(false); setEditId(null); setIsModalOpen(true);
   };
 
@@ -73,8 +81,48 @@ function GestaoMembros() {
     setFuncoesSelecionadas(prev => prev.includes(funcaoNome) ? prev.filter(f => f !== funcaoNome) : [...prev, funcaoNome]);
   };
 
+  // Lógica BLINDADA e OTIMISTA de Adicionar Função
+  const handleAdicionarFuncaoInline = async () => {
+    const nomeFuncao = novaFuncaoInline.trim();
+    if (!nomeFuncao) return;
+    
+    const token = localStorage.getItem('token');
+    
+    // 1. Verifica se já existe para evitar duplicidade
+    if (funcoesDisponiveis.some(f => f.toLowerCase() === nomeFuncao.toLowerCase())) {
+        if (!funcoesSelecionadas.includes(nomeFuncao)) {
+             setFuncoesSelecionadas(prev => [...prev, nomeFuncao]);
+        }
+        setNovaFuncaoInline('');
+        return;
+    }
+
+    // 2. ATUALIZAÇÃO OTIMISTA: Coloca na tela instantaneamente para o utilizador!
+    setFuncoesSelecionadas(prev => [...prev, nomeFuncao]);
+    setFuncoesDisponiveis(prev => [...prev, nomeFuncao]);
+    setNovaFuncaoInline('');
+
+    try {
+      // 3. Salva no banco de dados em segundo plano
+      const res = await fetch(`${API_BASE_URL}/funcoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ nome: nomeFuncao, membros_ids: [] })
+      });
+      const data = await res.json();
+      
+      // Se houver um erro real (diferente do falso positivo "'result'" do Turso), nós avisamos.
+      if (!res.ok || (data.error && data.error !== "'result'")) {
+        mostrarMensagem(`Aviso: Falha ao sincronizar na nuvem.`, "erro");
+      }
+    } catch (error) {
+      console.error("Erro de conexão silencioso:", error);
+    }
+  };
+
   const handleSalvar = async (e) => {
     e.preventDefault();
+    const token = localStorage.getItem('token');
     if (!nome.trim()) { mostrarMensagem("O nome é obrigatório!", "erro"); return; }
 
     const payload = { nome, telefone, email, status, funcoes: funcoesSelecionadas };
@@ -84,31 +132,43 @@ function GestaoMembros() {
       const method = isEditing ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
-        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        method, 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+        body: JSON.stringify(payload)
       });
+      const data = await res.json();
 
-      if (!res.ok) throw new Error("Falha ao salvar");
-
-      mostrarMensagem(isEditing ? "Membro atualizado!" : "Membro adicionado!", "sucesso");
-      setIsModalOpen(false);
-      carregarDados(); 
-    } catch (error) {
-      mostrarMensagem("Erro ao salvar membro.", "erro");
-    }
+      if (res.ok && !data.error) {
+        mostrarMensagem(isEditing ? "Membro atualizado!" : "Membro adicionado!", "sucesso");
+        setIsModalOpen(false);
+        carregarDados(); 
+      } else {
+        mostrarMensagem(`Erro: ${data.error || 'Falha ao salvar membro'}`, "erro");
+      }
+    } catch (error) { mostrarMensagem("Erro de conexão ao salvar membro.", "erro"); }
   };
 
   const handleEditar = (membro) => {
     setNome(membro.nome); setTelefone(membro.telefone || ''); setEmail(membro.email || '');
     setStatus(membro.status || 'ativo'); setFuncoesSelecionadas(membro.funcoes || []);
+    setNovaFuncaoInline('');
     setEditId(membro.id); setIsEditing(true); setIsModalOpen(true);
   };
 
   const handleExcluir = async (id) => {
     if (!window.confirm("Tem a certeza que deseja excluir este membro permanentemente?")) return;
+    const token = localStorage.getItem('token');
     try {
-      await fetch(`${API_BASE_URL}/equipe/${id}`, { method: 'DELETE' });
-      mostrarMensagem("Membro excluído com sucesso!", "sucesso");
-      carregarDados();
+      const res = await fetch(`${API_BASE_URL}/equipe/${id}`, { 
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && !data.error) {
+        mostrarMensagem("Membro excluído com sucesso!", "sucesso");
+        carregarDados();
+      } else {
+        mostrarMensagem(`Erro: ${data.error}`, "erro");
+      }
     } catch (error) { mostrarMensagem("Erro ao excluir membro.", "erro"); }
   };
 
@@ -118,46 +178,77 @@ function GestaoMembros() {
   };
 
   const handleSalvarNovaFuncao = async () => {
+    const token = localStorage.getItem('token');
     if (!novaFuncaoNome.trim()) { mostrarMensagem("O nome da função não pode estar vazio.", "erro"); return; }
     try {
-      await fetch(`${API_BASE_URL}/funcoes`, {
+      const res = await fetch(`${API_BASE_URL}/funcoes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ nome: novaFuncaoNome.trim(), membros_ids: novaFuncaoMembrosSelecionados })
       });
-      setNovaFuncaoNome('');
-      setNovaFuncaoMembrosSelecionados([]);
-      mostrarMensagem("Função criada com sucesso!", "sucesso");
-      carregarDados();
+      const data = await res.json();
+      if (res.ok && !data.error) {
+        setNovaFuncaoNome('');
+        setNovaFuncaoMembrosSelecionados([]);
+        mostrarMensagem("Função criada com sucesso!", "sucesso");
+        carregarDados();
+      } else {
+        mostrarMensagem(`Erro: ${data.error}`, "erro");
+      }
     } catch (error) { mostrarMensagem("Erro ao criar função.", "erro"); }
   };
 
   const handleExcluirFuncao = async (id) => {
-    if (!window.confirm("Excluir esta função vai removê-la de todos os membros e das escalas geradas. Continuar?")) return;
+    if (!window.confirm("Excluir esta função vai removê-la de todos os membros. Continuar?")) return;
+    const token = localStorage.getItem('token');
     try {
-      await fetch(`${API_BASE_URL}/funcoes/${id}`, { method: 'DELETE' });
-      carregarDados();
+      const res = await fetch(`${API_BASE_URL}/funcoes/${id}`, { 
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && !data.error) {
+        mostrarMensagem("Função excluída!", "sucesso");
+        carregarDados();
+      }
     } catch (error) { mostrarMensagem("Erro ao excluir função.", "erro"); }
   };
 
   const handleSalvarEdicaoFuncao = async (id) => {
+    const token = localStorage.getItem('token');
     if (!editandoFuncaoNome.trim()) return;
     try {
-      await fetch(`${API_BASE_URL}/funcoes/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/funcoes/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ nome: editandoFuncaoNome.trim() })
       });
-      setEditandoFuncaoId(null);
-      carregarDados();
+      const data = await res.json();
+      if (res.ok && !data.error) {
+        setEditandoFuncaoId(null);
+        carregarDados();
+      }
     } catch (error) { mostrarMensagem("Erro ao editar função.", "erro"); }
   };
 
   const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '5px', backgroundColor: '#282c34', color: 'white', border: '1px solid #4a505c', marginTop: '5px' };
 
+  // ESTILO DO AVISO FLUTUANTE (Para você sempre ver se deu erro ou sucesso!)
+  const toastStyle = {
+    position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
+    padding: '12px 25px', borderRadius: '8px', color: 'white', fontWeight: 'bold',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.4)', transition: 'all 0.3s ease',
+    backgroundColor: mensagem.tipo === 'sucesso' ? '#2ecc71' : '#e74c3c',
+    display: mensagem.texto ? 'block' : 'none'
+  };
+
   return (
     <div className="gerador-escala-container">
       
+      {/* NOTIFICAÇÃO FLUTUANTE (Mágica que aparece por cima de todos os modais) */}
+      <div style={toastStyle}>
+        {mensagem.tipo === 'sucesso' ? '✅' : '⚠️'} {mensagem.texto}
+      </div>
+
       {/* --- CABEÇALHO COM BOTÕES --- */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
         <h2>👥 Gestão de Membros</h2>
@@ -170,12 +261,6 @@ function GestaoMembros() {
           </button>
         </div>
       </div>
-
-      {mensagem.texto && !isModalOpen && !isFuncoesModalOpen && (
-        <div style={{ marginBottom: '20px', padding: '10px', textAlign: 'center', borderRadius: '5px', backgroundColor: mensagem.tipo === 'sucesso' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)', color: mensagem.tipo === 'sucesso' ? '#2ecc71' : '#ff4b4b', fontWeight: 'bold' }}>
-          {mensagem.texto}
-        </div>
-      )}
 
       {/* --- LISTA DE MEMBROS (MANTIDA IGUAL) --- */}
       <div className="input-area">
@@ -216,7 +301,7 @@ function GestaoMembros() {
       {/* --- MODAL (POP-UP) DE MEMBROS --- */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #4a505c', paddingBottom: '10px' }}>
               <h2 style={{ margin: 0 }}>{isEditing ? '✏️ Editar Membro' : '➕ Adicionar Novo Membro'}</h2>
               <button onClick={() => setIsModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#9ab', fontSize: '1.5em', cursor: 'pointer' }}>&times;</button>
@@ -224,7 +309,7 @@ function GestaoMembros() {
             
             <form onSubmit={handleSalvar}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
-                <div><label>Nome Completo *</label><input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Lucas Silva" style={inputStyle} /></div>
+                <div><label>Nome Completo *</label><input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Lucas Silva" style={inputStyle} required /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                   <div><label>Telefone / WhatsApp</label><input type="text" value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(DD) 99999-9999" style={inputStyle} /></div>
                   <div><label>E-mail</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemplo.com" style={inputStyle} /></div>
@@ -240,14 +325,39 @@ function GestaoMembros() {
 
               <div style={{ marginTop: '20px' }}>
                 <label>Funções / Instrumentos na Banda</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px', padding: '15px', backgroundColor: '#282c34', borderRadius: '8px', border: '1px solid #4a505c' }}>
-                  {funcoesDisponiveis.map((f, idx) => (
-                    <label key={idx} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', backgroundColor: '#3c414d', padding: '5px 10px', borderRadius: '15px', fontSize: '0.9em' }}>
-                      <input type="checkbox" checked={funcoesSelecionadas.includes(f)} onChange={() => handleToggleFuncao(f)} style={{ marginRight: '8px' }} />
-                      {f}
-                    </label>
-                  ))}
+                
+                {/* --- INPUT DE CRIAÇÃO RÁPIDA DE FUNÇÃO --- */}
+                <div style={{ display: 'flex', gap: '10px', marginTop: '5px', marginBottom: '10px' }}>
+                    <input 
+                      type="text" 
+                      value={novaFuncaoInline} 
+                      onChange={e => setNovaFuncaoInline(e.target.value)} 
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault(); // Impede o modal de fechar acidentalmente
+                          handleAdicionarFuncaoInline();
+                        }
+                      }}
+                      placeholder="Criar nova função (Ex: Violão, Bateria...)" 
+                      style={{ flex: 1, padding: '10px', borderRadius: '5px', backgroundColor: '#1e2229', color: 'white', border: '1px solid #f39c12' }} 
+                    />
+                    <button type="button" onClick={handleAdicionarFuncaoInline} style={{ padding: '0 20px', backgroundColor: '#f39c12', color: '#1e2229', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
+                      Adicionar
+                    </button>
                 </div>
+
+                {funcoesDisponiveis.length === 0 ? (
+                    <p style={{ color: '#9ab', fontSize: '0.9em', fontStyle: 'italic' }}>Nenhuma função cadastrada. Crie uma acima!</p>
+                ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '15px', backgroundColor: '#282c34', borderRadius: '8px', border: '1px solid #4a505c' }}>
+                    {funcoesDisponiveis.map((f, idx) => (
+                        <label key={idx} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', backgroundColor: '#3c414d', padding: '5px 10px', borderRadius: '15px', fontSize: '0.9em' }}>
+                        <input type="checkbox" checked={funcoesSelecionadas.includes(f)} onChange={() => handleToggleFuncao(f)} style={{ marginRight: '8px' }} />
+                        {f}
+                        </label>
+                    ))}
+                    </div>
+                )}
               </div>
 
               <div style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -267,12 +377,6 @@ function GestaoMembros() {
               <h2 style={{ margin: 0 }}>⚙️ Gerenciar Funções / Instrumentos</h2>
               <button onClick={() => setIsFuncoesModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#9ab', fontSize: '1.5em', cursor: 'pointer' }}>&times;</button>
             </div>
-
-            {mensagem.texto && isFuncoesModalOpen && (
-              <div style={{ marginBottom: '15px', padding: '10px', textAlign: 'center', borderRadius: '5px', backgroundColor: mensagem.tipo === 'sucesso' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)', color: mensagem.tipo === 'sucesso' ? '#2ecc71' : '#ff4b4b', fontWeight: 'bold' }}>
-                {mensagem.texto}
-              </div>
-            )}
 
             <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
               {/* Coluna 1: Lista de Funções */}
